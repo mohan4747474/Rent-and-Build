@@ -1,0 +1,63 @@
+app:
+   name: RentBuild India
+   env: dev
+   version: 1.0.0
+server:
+      # HTTP port. If busy, the app auto-retries port+1 up to 10 times.
+      port: 3000
+  # Absolute URL used in redirects (Razorpay success page, emails, etc.)
+      public-url: http://localhost:3000
+      # CORS dev allows everything. Lock down in prod.
+      cors:
+         origin: "*"
+
+database:
+# SQLite file (relative to project root). Auto-created on first run.
+     driver: sqlite
+     file: data/rentbuild.db
+     journal-mode: WAL
+     foreign-keys: true
+
+security:
+# JWT signing secret. DEV ONLY replace in prod with 32+ random bytes.
+    jwt:
+       secret: dev_secret_change_me_in_prod
+       expires-in: 7d
+bcrypt:
+    rounds: 10
+
+payments:
+  provider: razorpay
+# Razorpay TEST keys. Get free ones at https://dashboard.razorpay.com
+# If left blank / placeholder, the app runs in DEMO mode: bookings are
+# auto-marked paid so you can preview the full flow without an account.
+  razorpay:
+    key-id: rzp_test_replace_me
+    key-secret: replace_me
+    currency: INR
+    country: IN
+  pricing:
+    service-fee-pct: 5 # platform fee
+    gst-pct: 18 # Indian GST
+
+seed:
+  # Idempotent demo accounts, re-ensured on every boot by server/seed.js
+  users:
+    - email: admin@rentbuild.in
+      password: admin123
+      role: admin
+      name: Admin
+    - email: owner@rentbuild.in
+      password: owner123
+      role: owner
+      name: Mohan R halageri
+
+logging:
+   level: debug
+   # In dev we log to stdout only. In prod, add file/rotate.
+   format: pretty
+feature-flags:
+  reviews: true
+  favorites: true
+  admin-dashboard: true
+  webhook-verification: false # server-initiated Razorpay webhook (todo)

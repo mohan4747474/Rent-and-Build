@@ -1,0 +1,16 @@
+meta {
+     name: admin
+     type: http
+     seq: 3
+}
+
+get {
+    url: Authorization: Bearer {{adminToken}}
+2
+api/admin/users
+body: none
+auth: inherit
+}
+settings {
+    encodeurl: true
+}

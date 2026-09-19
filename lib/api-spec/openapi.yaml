@@ -10,6 +10,9 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: auth
+  - name: payments
+  - name: tracking
 paths:
   /healthz:
     get:
@@ -24,7 +27,55 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /auth/register:
+    post:
+      tags: [auth]
+      summary: Register a marketplace account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201": { description: Account created }
+        "409": { description: Email already registered }
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: Issue a JWT access token
+      responses:
+        "200": { description: Authenticated }
+        "401": { description: Invalid credentials }
+  /payments/create-order:
+    post:
+      tags: [payments]
+      security: [{ bearerAuth: [] }]
+      summary: Create a Razorpay order for a booking
+      responses:
+        "201": { description: Razorpay order created }
+  /payments/verify:
+    post:
+      tags: [payments]
+      security: [{ bearerAuth: [] }]
+      summary: Verify a Razorpay payment signature
+      responses:
+        "200": { description: Payment verified }
+  /tracking/current/{equipmentId}:
+    get:
+      tags: [tracking]
+      security: [{ bearerAuth: [] }]
+      summary: Read the latest ECU/GPS telemetry
+      parameters:
+        - { name: equipmentId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200": { description: Current telemetry }
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
   schemas:
     HealthStatus:
       type: object
@@ -33,4 +84,11 @@ components:
           type: string
       required:
         - status
-
+    RegisterRequest:
+      type: object
+      required: [email, password, name, phone]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8, format: password }
+        name: { type: string }
+        phone: { type: string }

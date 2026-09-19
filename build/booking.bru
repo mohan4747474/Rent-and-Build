@@ -1,0 +1,20 @@
+meta {
+name: booking
+type: http
+seq: 2
+}
+get {
+
+url: http://localhost:3000/api/admin/bookings
+body: json
+auth: inherit
+
+headers {
+
+Authorization: Bearer eyJhbGciOillUzI1NilsInR5cCl6lkpXVC19.eyJpZCI6MywiZW1haWwiOilhZG1pbkByZW50YnVpbGQuaW4iLClyb2xlljoiYWRtaW4iLCJuYW1lljo iQWRtaW4iLCJpYXQiOjE3ODk1NDM10TYsImV4cCl6MTc5MDE0ODM5Nn0.0_aWe40h0lxP2BHVe-5ABYoS22gP2dM0bUD7_qAVVMs
+Content-Type: application/json
+Accept: application/json
+}
+settings {
+encodelld: true
+}

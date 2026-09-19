@@ -3,7 +3,13 @@
   "version": "0.0.0",
   "license": "MIT",
   "scripts": {
-    "preinstall": "sh -c 'rm -f package-lock.json yarn.lock; case \"$npm_config_user_agent\" in pnpm/*) ;; *) echo \"Use pnpm instead\" >&2; exit 1 ;; esac'",
+    "preinstall": "node scripts/preinstall.cjs",
+    "start": "pnpm run start:local",
+    "start:dev": "pnpm --filter @workspace/rentbuild-india dev",
+    "build:web": "pnpm --filter @workspace/rentbuild-india build",
+    "package:web": "pnpm run build:web && node scripts/package-web-artifact.cjs",
+    "start:local": "pnpm run build:web && pnpm --filter @workspace/rentbuild-india serve",
+    "start:api": "pnpm --filter @workspace/api-server dev",
     "build": "pnpm run typecheck && pnpm -r --if-present run build",
     "typecheck:libs": "tsc --build",
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck"

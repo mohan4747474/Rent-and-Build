@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="Autolmport Settings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="BackgroundAgentGlobalSettings">
+    <option name="selectedModelId" value="auto" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="9ac49d6c-4bf9-487d-9639-5b8d44fba6b9" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/artifacts/api-server/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/artifacts/api-server/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/artifacts/api-server/src/app.ts" beforeDir="false" afterPath="$PROJECT_DIR$/artifacts/api-server/src/app.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/artifacts/api-server/src/index.ts" beforeDir="false" afterPath="$PROJECT_DIR$/artifacts/api-server/src/index.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/artifacts/api-server/src/routes/index.ts" beforeDir="false" afterPath="$PROJECT_DIR$/artifacts/api-server/src/routes/index.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/artifacts/mockup-sandbox/mockupPreviewPlugin.ts" beforeDir="false" afterPath="$PROJECT_DIR$/artifacts/mockup-sandbox/mockupPreviewPlugin.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/artifacts/rentbuild-india/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/artifacts/rentbuild-india/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/artifacts/rentbuild-india/src/App.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/artifacts/rentbuild-india/src/App.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/artifacts/rentbuild-india/vite.config.ts" beforeDir="false" afterPath="$PROJECT_DIR$/artifacts/rentbuild-india/vite.config.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/api-spec/openapi.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/lib/api-spec/openapi.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/db/src/schema/index.ts" beforeDir="false" afterPath="$PROJECT_DIR$/lib/db/src/schema/index.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pnpm-lock.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/pnpm-lock.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pnpm-workspace.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/pnpm-workspace.yaml" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="Changelist Manager">
+    <list default="true" id="f9c28220-1387-4d07-9f72-37646646ba58" name="Changes" comment="" />
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="CopilotPersistence">
+    <persistenceIdMap>
+      <entry key="_C:/Users/mvina/IdeaProjects/Rent-and-Build" value="3JXMfGbgJ1njRVf6oEuuLXXeMTb" />
+    </persistenceIdMap>
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="XML Properties File" />
+      </list>
+    </option>
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;mohan4747474&quot;
+  }
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/mohan4747474/Rent-and-Build.git&quot;,
+    &quot;accountId&quot;: &quot;c408e6f2-a0d0-4e8f-bc42-c728712adda8&quot;
+  }
+}</component>
+  <component name="PackageJsonUpdateNotifier">
+    <dismissed value="$PROJECT_DIR$/artifacts/rentbuild-india/package.json" />
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 2,
+  &quot;fromUser&quot;: false
+}</component>
+  <component name="ProjectColorinfo">{
+        &quot;customColor&quot;: &quot;&quot;,
+        &quot;associatedIndex&quot;: 2
+        }</component>
+  <component name="ProjectId" id="3JXIheqbBARURVaf2b8mptxxkCc" />
+  <component name="ProjectSessionTemplates">
+    <option name="panelTemplate">
+      <template>
+        <option name="modeId" value="Agent" />
+        <option name="model">
+          <model>
+            <option name="modelType" value="builtin_id" />
+            <option name="modelValue" value="auto" />
+          </model>
+        </option>
+        <option name="targetType" value="BACKGROUND" />
+        <option name="worktreeMode" value="WORKSPACE" />
+      </template>
+    </option>
+  </component>
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="Projectid" id="3JRXMSROI8PnmrKvnOfCCoHxFHJ" />
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
+    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
+    "SHELLCHECK.PATH": "C:\\Users\\mvina\\AppData\\Roaming\\JetBrains\\IntelliJIdea2026.1\\plugins\\Shell Script\\shellcheck.exe",
+    "Shell Script.main.executor": "Run",
+    "Shell Script.rent & build.executor": "Run",
+    "codeWithMe.voiceChat.enabledByDefault": "false",
+    "copilot.chat.legacySessionMetadata.migrated": "true",
+    "git-widget-placeholder": "main",
+    "javascript.preferred.runtime.type.id": "node",
+    "kotlin-language-version-configured": "true",
+    "nodejs_interpreter_path": "C:/Users/mvina/AppData/Roaming/JetBrains/IntelliJIdea2026.1/node/versions/24.21.0/node",
+    "nodejs_package_manager_path": "pnpm",
+    "settings.editor.selected.configurable": "preferences.pluginManager",
+    "ts.external.directory.path": "C:\\Users\\mvina\\IdeaProjects\\Rent-and-Build\\node_modules\\typescript\\lib"
+  }
+}]]></component>
+  <component name="RunManager" selected="Shell Script.main">
+    <configuration default="true" type="Kotlin StandaloneScriptRunConfigurationType">
+      <module name="RENT BUILD" />
+      <option name="filePath" />
+      <method v="2" />
+    </configuration>
+    <configuration default="true" type="LetRunConfigurationType">
+      <module name="RENT BUILD" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="main" type="ShConfigurationType">
+      <option name="SCRIPT_TEXT" value="" />
+      <option name="INDEPENDENT_SCRIPT_PATH" value="true" />
+      <option name="SCRIPT_PATH" value="$PROJECT_DIR$/node_modules/.bin/prettier" />
+      <option name="SCRIPT_OPTIONS" value="" />
+      <option name="INDEPENDENT_SCRIPT_WORKING_DIRECTORY" value="true" />
+      <option name="SCRIPT_WORKING_DIRECTORY" value="$PROJECT_DIR$/node_modules/.bin" />
+      <option name="INDEPENDENT_INTERPRETER_PATH" value="true" />
+      <option name="INTERPRETER_PATH" value="/bin/sh" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="EXECUTE_IN_TERMINAL" value="true" />
+      <option name="EXECUTE_SCRIPT_FILE" value="true" />
+      <envs />
+      <method v="2" />
+    </configuration>
+    <configuration name="rent &amp; build" type="ShConfigurationType">
+      <option name="SCRIPT_TEXT" value="" />
+      <option name="INDEPENDENT_SCRIPT_PATH" value="true" />
+      <option name="SCRIPT_PATH" value="$PROJECT_DIR$/node_modules/.bin/prettier" />
+      <option name="SCRIPT_OPTIONS" value="" />
+      <option name="INDEPENDENT_SCRIPT_WORKING_DIRECTORY" value="true" />
+      <option name="SCRIPT_WORKING_DIRECTORY" value="$PROJECT_DIR$/node_modules/.bin" />
+      <option name="INDEPENDENT_INTERPRETER_PATH" value="true" />
+      <option name="INTERPRETER_PATH" value="/bin/sh" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="EXECUTE_IN_TERMINAL" value="true" />
+      <option name="EXECUTE_SCRIPT_FILE" value="true" />
+      <envs />
+      <method v="2" />
+    </configuration>
+  </component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-jdk-30f59d01ecdd-37e91769500f-intellij.indexing.shared.core-IU-261.25134.95" />
+        <option value="bundled-js-predefined-d6986cc7102b-31caf2ab9e3c-JavaScript-IU-261.25134.95" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="Task Manager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="f9c28220-f387-4d07-9f72-37646646ba58" name="Changes" comment="" />
+      <created>1789624807692</created>
+      <option name="number" value="Default" />
+      <option name="presentableld" value="Default" />
+      <updated>1789624807692</updated>
+    </task>
+    <servers />
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="9ac49d6c-4bf9-487d-9639-5b8d44fba6b9" name="Changes" comment="" />
+      <created>1789801106936</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1789801106936</updated>
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="XSLT-Support.FileAssociations.UIState">
+    <expand />
+    <select />
+  </component>
+</project>

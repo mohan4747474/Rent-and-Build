@@ -1,0 +1,22 @@
+meta {
+name: paymenat
+type: http
+seq: 1
+}
+post {
+url: http://localhost:3000/api/auth/login
+body: json
+auth: inherit
+}
+headers {
+Content-Type: application/json
+}
+body:json {
+{
+"email": "admin@rentbuild.in",
+"password": "admin123"
+}
+}
+settings {
+encodeurl: true
+}

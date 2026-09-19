@@ -72,9 +72,8 @@ const clerkPubKey = publishableKeyFromHost(
 const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
 
-if (!clerkPubKey) {
-  throw new Error('Missing VITE_CLERK_PUBLISHABLE_KEY in .env file');
-}
+// The marketplace remains browsable without Clerk; protected actions show the sign-in route.
+// Configure VITE_CLERK_PUBLISHABLE_KEY in production to enable managed authentication.
 
 type Equipment = {
   id: string;
@@ -122,6 +121,16 @@ type SensorData = {
   workHours: number;
   kmDriven: number;
   fuel: number;
+  odometerKm: number;
+  latitude: number;
+  longitude: number;
+  speedKph: number;
+  engineRpm: number;
+  engineLoad: number;
+  batteryVoltage: number;
+  oilPressure: number;
+  coolantLevel: number;
+  fuelRate: number;
   engineStatus: 'Running' | 'Idle' | 'Stopped';
   lastSync: string;
 };
@@ -233,6 +242,16 @@ const defaultSensors: Record<string, SensorData> = {
     workHours: 53.09,
     kmDriven: 0,
     fuel: 78.4,
+    odometerKm: 18420,
+    latitude: 12.9716,
+    longitude: 77.5946,
+    speedKph: 18.4,
+    engineRpm: 1420,
+    engineLoad: 62,
+    batteryVoltage: 24.8,
+    oilPressure: 4.2,
+    coolantLevel: 91,
+    fuelRate: 8.6,
     engineStatus: 'Running',
     lastSync: '18 seconds ago',
   },
@@ -242,6 +261,16 @@ const defaultSensors: Record<string, SensorData> = {
     workHours: 418.3,
     kmDriven: 184.7,
     fuel: 62.1,
+    odometerKm: 48210,
+    latitude: 17.385,
+    longitude: 78.4867,
+    speedKph: 12.1,
+    engineRpm: 1180,
+    engineLoad: 48,
+    batteryVoltage: 25.1,
+    oilPressure: 3.8,
+    coolantLevel: 88,
+    fuelRate: 12.4,
     engineStatus: 'Idle',
     lastSync: '42 seconds ago',
   },
@@ -251,6 +280,16 @@ const defaultSensors: Record<string, SensorData> = {
     workHours: 214.8,
     kmDriven: 0,
     fuel: 91.8,
+    odometerKm: 9210,
+    latitude: 19.076,
+    longitude: 72.8777,
+    speedKph: 0,
+    engineRpm: 0,
+    engineLoad: 0,
+    batteryVoltage: 25.4,
+    oilPressure: 0,
+    coolantLevel: 95,
+    fuelRate: 0,
     engineStatus: 'Stopped',
     lastSync: '1 minute ago',
   },
@@ -657,7 +696,7 @@ function AdminBookingsPage() {
 
 function AdminSensorsPage() {
   const { equipment, sensors } = useAppState();
-  return <AdminShell><SectionLabel eyebrow="Admin / sensors" title="ECU feed health." body="Watch the sensor fields that matter for each machine class before wiring the physical ECU gateway." /><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{equipment.slice(0, 4).map((item) => { const sensor = sensors[item.id] ?? defaultSensors['cat-320']; return <article key={item.id} className="border border-border bg-card p-5"><div className="flex items-start justify-between"><div><div className="mono-font text-[10px] text-primary">{item.type}</div><h3 className="mt-2 font-bold">{item.name}</h3></div><span className="flex items-center gap-2 text-[10px] text-emerald-400"><span className="h-2 w-2 rounded-full bg-emerald-400" />Connected</span></div><div className="mt-5 grid grid-cols-2 gap-2 text-xs">{[['Temp', `${sensor.temperature} °C`], [item.type === 'Dump truck' ? 'KM driven' : 'Mileage', `${item.type === 'Dump truck' ? sensor.kmDriven : sensor.mileage} km`], ['Work hours', `${sensor.workHours} h`], ['Engine', sensor.engineStatus]].map(([label, value]) => <div key={label} className="border border-border p-3"><div className="text-[10px] text-muted-foreground">{label}</div><div className="mono-font mt-2 font-bold text-primary">{value}</div></div>)}</div></article>; })}</div></AdminShell>;
+  return <AdminShell><SectionLabel eyebrow="Admin / sensors" title="ECU feed health." body="All machine telemetry is visible here: GPS, engine, fuel, electrical, fluid, odometer, and work-session readings." /><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{equipment.slice(0, 4).map((item) => { const sensor = sensors[item.id] ?? defaultSensors['cat-320']; const readings = [['GPS latitude', `${sensor.latitude.toFixed(5)}°`], ['GPS longitude', `${sensor.longitude.toFixed(5)}°`], ['Speed', `${sensor.speedKph} km/h`], ['Odometer', `${sensor.odometerKm.toLocaleString('en-IN')} km`], ['Engine temperature', `${sensor.temperature} °C`], ['Engine RPM', `${sensor.engineRpm}`], ['Engine load', `${sensor.engineLoad}%`], ['Work hours', `${sensor.workHours} h`], ['Fuel level', `${sensor.fuel}%`], ['Fuel rate', `${sensor.fuelRate} L/h`], ['Battery voltage', `${sensor.batteryVoltage} V`], ['Oil pressure', `${sensor.oilPressure} bar`], ['Coolant level', `${sensor.coolantLevel}%`], ['Distance today', `${sensor.kmDriven} km`], ['Engine state', sensor.engineStatus], ['Last ECU sync', sensor.lastSync]]; return <article key={item.id} className="border border-border bg-card p-5"><div className="flex items-start justify-between"><div><div className="mono-font text-[10px] text-primary">{item.type} · {item.city}</div><h3 className="mt-2 font-bold">{item.name}</h3><div className="mt-1 text-[10px] text-muted-foreground">Vehicle {item.id.toUpperCase()} · ECU connected</div></div><span className="flex items-center gap-2 text-[10px] text-emerald-400"><span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />Live</span></div><div className="mt-5 grid grid-cols-2 gap-2 text-xs">{readings.map(([label, value]) => <div key={label} className="border border-border p-3"><div className="text-[10px] text-muted-foreground">{label}</div><div className="mono-font mt-2 font-bold text-primary">{value}</div></div>)}</div></article>; })}</div></AdminShell>;
 }
 
 function AdminNotificationsPage() {
@@ -730,7 +769,7 @@ const clerkAppearance = {
 function ClerkProviderWithRoutes() {
   const [, setLocation] = useLocation();
   const stripBase = (path: string) => basePath && path.startsWith(basePath) ? path.slice(basePath.length) || '/' : path;
-  return <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl} appearance={clerkAppearance} signInUrl={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} localization={{ signIn: { start: { title: 'Welcome back', subtitle: 'Sign in to access your account' } }, signUp: { start: { title: 'Create your account', subtitle: 'Start booking with confidence' } } }} routerPush={(to) => setLocation(stripBase(to))} routerReplace={(to) => setLocation(stripBase(to))}><AppStateProvider><Router /></AppStateProvider></ClerkProvider>;
+  return <ClerkProvider publishableKey={clerkPubKey || 'pk_test_placeholder'} proxyUrl={clerkProxyUrl} appearance={clerkAppearance} signInUrl={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} localization={{ signIn: { start: { title: 'Welcome back', subtitle: 'Sign in to access your account' } }, signUp: { start: { title: 'Create your account', subtitle: 'Start booking with confidence' } } }} routerPush={(to) => setLocation(stripBase(to))} routerReplace={(to) => setLocation(stripBase(to))}><AppStateProvider><Router /></AppStateProvider></ClerkProvider>;
 }
 
 function App() {
