@@ -61,6 +61,9 @@ export const bookings = pgTable("bookings", {
   siteAddress: text("site_address").notNull(),
   amountPaise: integer("amount_paise").notNull(),
   status: bookingStatusEnum("status").default("requested").notNull(),
+  cancellationFeePaise: integer("cancellation_fee_paise"),
+  refundAmountPaise: integer("refund_amount_paise"),
+  cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
   ...audit,
 });
 

@@ -100,11 +100,14 @@ type WorkspaceUser = {
   role: 'customer' | 'owner' | 'operator' | 'admin';
 };
 
+type LocalAccount = WorkspaceUser & { password: string };
+
 const LocalAuthContext = createContext<{
   isLoaded: boolean;
   isSignedIn: boolean;
   user: WorkspaceUser | null;
-  register: (user: WorkspaceUser) => void;
+  register: (user: WorkspaceUser, password?: string) => void;
+  login: (userId: string, password: string) => WorkspaceUser | null;
   signOut: () => void;
 } | null>(null);
 
@@ -118,12 +121,13 @@ function useWorkspaceUser() {
   const local = useContext(LocalAuthContext);
   if (local) return { user: local.user };
   const clerk = useUser();
+  const clerkRole = clerk.user?.publicMetadata?.role;
   return {
     user: clerk.user
       ? {
           fullName: clerk.user.fullName ?? 'Workspace user',
           primaryEmailAddress: { emailAddress: clerk.user.primaryEmailAddress?.emailAddress ?? '' },
-          role: 'customer' as const,
+          role: (clerkRole === 'admin' || clerkRole === 'owner' || clerkRole === 'operator' ? clerkRole : 'customer') as WorkspaceUser['role'],
         }
       : null,
   };
@@ -138,11 +142,45 @@ function useWorkspaceClerk() {
 
 function LocalAuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useStoredState<WorkspaceUser | null>('rb-local-user', null);
+  const [accounts, setAccounts] = useStoredState<LocalAccount[]>('rb-local-accounts', [
+    {
+      fullName: 'RentBuild Administrator',
+      primaryEmailAddress: { emailAddress: 'ADMIN@GMAIL.COM' },
+      role: 'admin',
+      password: 'ADMIN12345',
+    },
+  ]);
+  useEffect(() => {
+    if (!accounts.some((account) => account.primaryEmailAddress.emailAddress.toLowerCase() === 'admin@gmail.com')) {
+      setAccounts((current) => [...current, {
+        fullName: 'RentBuild Administrator',
+        primaryEmailAddress: { emailAddress: 'ADMIN@GMAIL.COM' },
+        role: 'admin',
+        password: 'ADMIN12345',
+      }]);
+    }
+  }, [accounts, setAccounts]);
   const value = {
     isLoaded: true,
     isSignedIn: Boolean(user),
     user,
-    register: setUser,
+    register: (nextUser: WorkspaceUser, password = '') => {
+      setAccounts((current) => {
+        const withoutExisting = current.filter((account) => account.primaryEmailAddress.emailAddress.toLowerCase() !== nextUser.primaryEmailAddress.emailAddress.toLowerCase());
+        return [...withoutExisting, { ...nextUser, password }];
+      });
+      setUser(nextUser);
+    },
+    login: (userId: string, password: string) => {
+      const account = accounts.find((candidate) =>
+        candidate.primaryEmailAddress.emailAddress.toLowerCase() === userId.trim().toLowerCase() &&
+        candidate.password === password,
+      );
+      if (!account) return null;
+      const { password: _password, ...authenticatedUser } = account;
+      setUser(authenticatedUser);
+      return authenticatedUser;
+    },
     signOut: () => setUser(null),
   };
   return <LocalAuthContext.Provider value={value}>{children}</LocalAuthContext.Provider>;
@@ -159,8 +197,10 @@ type Booking = {
   endDate: string;
   total: number;
   paymentMethod: string;
-  paymentStatus: 'paid' | 'pending';
-  status: 'payment-confirmed' | 'confirmed' | 'in-transit' | 'on-site' | 'completed';
+  paymentStatus: 'paid' | 'pending' | 'refunded';
+  status: 'payment-confirmed' | 'confirmed' | 'in-transit' | 'on-site' | 'completed' | 'cancelled';
+  cancellationFee?: number;
+  refundAmount?: number;
   createdAt: string;
 };
 
@@ -385,6 +425,7 @@ type AppState = {
   setProfile: (profile: UserProfile) => void;
   bookings: Booking[];
   addBooking: (booking: Booking) => void;
+  updateBooking: (id: string, update: Partial<Booking>) => void;
   notifications: AppNotification[];
   addNotification: (notification: Omit<AppNotification, 'id' | 'time'>) => void;
   markNotificationsRead: () => void;
@@ -442,6 +483,8 @@ function AppStateProvider({ children }: { children: ReactNode }) {
         setProfile,
         bookings,
         addBooking: (booking) => setBookings((current) => [booking, ...current]),
+        updateBooking: (id, update) =>
+          setBookings((current) => current.map((booking) => booking.id === id ? { ...booking, ...update } : booking)),
         notifications,
         addNotification,
         markNotificationsRead: () =>
@@ -656,19 +699,42 @@ function HowItWorksPage() {
 function AuthPage({ mode }: { mode: 'sign-in' | 'sign-up' }) {
   if (localDemoMode) {
     const auth = useContext(LocalAuthContext);
+    const [location] = useLocation();
     const [form, setForm] = useState({ name: '', email: '', phone: '', password: '', role: 'customer' as WorkspaceUser['role'] });
+    const [error, setError] = useState('');
     const submit = (event: FormEvent) => {
       event.preventDefault();
       if (!auth) return;
-      auth.register({
-        fullName: form.name || 'RentBuild user',
-        primaryEmailAddress: { emailAddress: form.email || 'user@rentbuild.local' },
-        role: form.role,
-      });
-      window.history.pushState({}, '', `${basePath}/`);
+      let authenticatedUser: WorkspaceUser;
+      if (mode === 'sign-up') {
+        authenticatedUser = {
+          fullName: form.name || 'RentBuild user',
+          primaryEmailAddress: { emailAddress: form.email || 'user@rentbuild.local' },
+          role: form.role,
+        };
+        auth.register(authenticatedUser, form.password);
+      } else {
+        const signedInUser = auth.login(form.email, form.password);
+        if (!signedInUser) {
+          setError('Invalid user ID or password.');
+          return;
+        }
+        authenticatedUser = signedInUser;
+      }
+      const requestedRole = new URLSearchParams(location.split('?')[1] ?? '').get('role');
+      const destination = mode === 'sign-up'
+        ? form.role === 'admin' ? '/admin' : form.role === 'owner' ? '/owner/dashboard' : form.role === 'operator' ? '/fleet' : '/'
+        : authenticatedUser.role === 'owner' || requestedRole === 'owner' && authenticatedUser.role === 'owner'
+          ? '/owner/dashboard'
+          : authenticatedUser.role === 'admin'
+            ? '/admin'
+            : authenticatedUser.role === 'operator'
+              ? '/fleet'
+              : '/';
+      window.history.pushState({}, '', `${basePath}${destination}`);
       window.dispatchEvent(new PopStateEvent('popstate'));
     };
-    return <div className="flex min-h-[100dvh] items-center justify-center bg-background px-5 py-10"><form onSubmit={submit} className="w-full max-w-md border border-border bg-card p-7"><Logo /><h1 className="display-font mt-8 text-4xl font-bold uppercase">{mode === 'sign-in' ? 'Sign in locally' : 'Create account'}</h1><p className="mt-3 text-sm leading-6 text-muted-foreground">Local mode stores a demo session in this browser. Register before accessing the marketplace and fleet pages.</p>{mode === 'sign-up' && <input required placeholder="Full name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="mt-6 h-11 w-full border border-input bg-background px-3 text-sm" />}<input required type="email" placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="mt-3 h-11 w-full border border-input bg-background px-3 text-sm" /><input required type="password" minLength={8} placeholder="Password (8+ characters)" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="mt-3 h-11 w-full border border-input bg-background px-3 text-sm" />{mode === 'sign-up' && <><input required placeholder="Phone number" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="mt-3 h-11 w-full border border-input bg-background px-3 text-sm" /><select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as WorkspaceUser['role'] })} className="mt-3 h-11 w-full border border-input bg-background px-3 text-sm"><option value="customer">Customer</option><option value="owner">Equipment owner</option><option value="operator">Operator</option></select></>}<button className="mt-6 flex h-11 w-full items-center justify-center gap-2 bg-primary text-xs font-bold text-primary-foreground">{mode === 'sign-in' ? 'SIGN IN' : 'REGISTER AND CONTINUE'} <ArrowRight size={15} /></button><Link href={mode === 'sign-in' ? '/sign-up' : '/sign-in'} className="mt-5 block text-center text-xs font-semibold text-primary">{mode === 'sign-in' ? 'Need an account? Register' : 'Already registered? Sign in'}</Link></form></div>;
+    return <div className="flex min-h-[100dvh] items-center justify-center bg-background px-5 py-10"><form onSubmit={submit} className="w-full max-w-md border border-border bg-card p-7"><Logo /><h1 className="display-font mt-8 text-4xl font-bold uppercase">{mode === 'sign-in' ? 'Sign in locally' : 'Create account'}</h1><p className="mt-3 text-sm leading-6 text-muted-foreground">Use the credentials for the account type you want to access. Owner login opens the owner workspace; administrator login opens the control room.</p>{mode === 'sign-up' && <input required placeholder="Full name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="mt-6 h-11 w-full border border-input bg-background px-3 text-sm" />}<input required type="email" placeholder="Email / user ID" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="mt-3 h-11 w-full border border-input bg-background px-3 text-sm" /><input required type="password" minLength={8} placeholder="Password (8+ characters)" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="mt-3 h-11 w-full border border-input bg-background px-3 text-sm" />{mode === 'sign-up' && <><input required placeholder="Phone number" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="mt-3 h-11 w-full border border-input bg-background px-3 text-sm" /><select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as WorkspaceUser['role'] })} className="mt-3 h-11 w-full border border-input bg-background px-3 text-sm"><option value="customer">Customer</option><option value="owner">Equipment owner</option><option value="operator">Operator</option></select></>}{error && <p className="mt-3 text-xs text-red-400">{error}</p>}<button className="mt-6 flex h-11 w-full items-center justify-center gap-2 bg-primary text-xs font-bold text-primary-foreground">{mode === 'sign-in' ? 'SIGN IN' : 'REGISTER AND CONTINUE'} <ArrowRight size={15} /></button><Link href={mode === 'sign-in' ? '/sign-up' : '/sign-in'} className="mt-5 block text-center text-xs font-semibold text-primary">{mode === 'sign-in' ? 'Need an account? Register' : 'Already registered? Sign in'}</Link></form></div>;
   }
   const path = `${basePath}/${mode}`;
   const AuthComponent = mode === 'sign-in' ? SignIn : SignUp;
@@ -678,19 +744,20 @@ function AuthPage({ mode }: { mode: 'sign-in' | 'sign-up' }) {
 function AdminLoginPage() {
   const auth = useWorkspaceAuth();
   const local = useContext(LocalAuthContext);
-  const [form, setForm] = useState({ email: '', password: '' });
+  const [form, setForm] = useState({ userId: '', password: '' });
   const [error, setError] = useState('');
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    if (localDemoMode && form.email === 'admin@rentbuild.local' && form.password === 'Admin@12345') {
-      local?.register({ fullName: 'RentBuild Administrator', primaryEmailAddress: { emailAddress: form.email }, role: 'admin' });
+    if (localDemoMode && form.userId.trim().toLowerCase() === (import.meta.env.VITE_ADMIN_USER_ID || 'ADMIN@GMAIL.COM').toLowerCase() && form.password === (import.meta.env.VITE_ADMIN_PASSWORD || 'ADMIN12345')) {
+      local?.login(form.userId, form.password);
       window.location.href = `${basePath}/admin`;
       return;
     }
     setError('Invalid administrator credentials.');
   };
-  if (localDemoMode) return <div className="flex min-h-[100dvh] items-center justify-center bg-background px-5"><form onSubmit={submit} className="w-full max-w-md border border-border bg-card p-7"><Logo /><div className="mt-7 grid h-12 w-12 place-items-center bg-primary text-primary-foreground"><ShieldCheck size={22} /></div><h1 className="display-font mt-5 text-4xl font-bold uppercase">Admin login</h1><p className="mt-2 text-sm leading-6 text-muted-foreground">Separate administrator access with full fleet, booking, payment, and notification visibility.</p><input required type="email" placeholder="Admin email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="mt-6 h-11 w-full border border-input bg-background px-3 text-sm" /><input required type="password" placeholder="Admin password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="mt-3 h-11 w-full border border-input bg-background px-3 text-sm" />{error && <p className="mt-3 text-xs text-red-400">{error}</p>}<button className="mt-6 flex h-11 w-full items-center justify-center gap-2 bg-primary text-xs font-bold text-primary-foreground">SIGN IN AS ADMIN <ArrowRight size={15} /></button><p className="mt-4 text-[10px] text-muted-foreground">Local demo ID: admin@rentbuild.local · Password: Admin@12345</p></form></div>;
-  return <div className="flex min-h-[100dvh] items-center justify-center bg-background px-5"><div className="w-full max-w-md border border-border bg-card p-7"><Link href="/" className="mb-10 inline-flex"><Logo /></Link><div className="grid h-12 w-12 place-items-center bg-primary text-primary-foreground"><ShieldCheck size={22} /></div><h1 className="display-font mt-6 text-4xl font-bold uppercase">Admin access</h1><p className="mt-2 text-sm leading-6 text-muted-foreground">A separate console for users, bookings, notifications, and ECU operations. Admin permissions are applied to your managed account.</p>{auth.isSignedIn ? <Link href="/admin" className="mt-7 flex h-12 items-center justify-center gap-2 bg-primary text-sm font-bold text-primary-foreground">CONTINUE TO ADMIN CONSOLE <ArrowRight size={15} /></Link> : <Link href="/sign-in" className="mt-7 flex h-12 items-center justify-center gap-2 bg-primary text-sm font-bold text-primary-foreground">SIGN IN AS ADMIN <LogIn size={15} /></Link>}<Link href="/" className="mt-5 flex items-center justify-center gap-2 text-xs font-semibold text-muted-foreground hover:text-primary"><ArrowLeft size={13} /> Back to marketplace</Link></div></div>;
+  if (localDemoMode) return <div className="flex min-h-[100dvh] items-center justify-center bg-background px-5"><form onSubmit={submit} className="w-full max-w-md border border-border bg-card p-7"><Logo /><div className="mt-7 grid h-12 w-12 place-items-center bg-primary text-primary-foreground"><ShieldCheck size={22} /></div><h1 className="display-font mt-5 text-4xl font-bold uppercase">Admin login</h1><p className="mt-2 text-sm leading-6 text-muted-foreground">Use the separate administrator user ID and password. Customer accounts cannot access this console.</p><input required placeholder="Admin user ID" value={form.userId} onChange={(e) => setForm({ ...form, userId: e.target.value })} className="mt-6 h-11 w-full border border-input bg-background px-3 text-sm" /><input required type="password" placeholder="Admin password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="mt-3 h-11 w-full border border-input bg-background px-3 text-sm" />{error && <p className="mt-3 text-xs text-red-400">{error}</p>}<button className="mt-6 flex h-11 w-full items-center justify-center gap-2 bg-primary text-xs font-bold text-primary-foreground">SIGN IN AS ADMIN <ArrowRight size={15} /></button><p className="mt-4 text-[10px] text-muted-foreground">Configure VITE_ADMIN_USER_ID and VITE_ADMIN_PASSWORD for the local demo.</p></form></div>;
+  const { user } = useWorkspaceUser();
+  return <div className="flex min-h-[100dvh] items-center justify-center bg-background px-5"><div className="w-full max-w-md border border-border bg-card p-7"><Link href="/" className="mb-10 inline-flex"><Logo /></Link><div className="grid h-12 w-12 place-items-center bg-primary text-primary-foreground"><ShieldCheck size={22} /></div><h1 className="display-font mt-6 text-4xl font-bold uppercase">Admin access</h1><p className="mt-2 text-sm leading-6 text-muted-foreground">A separate console for users, bookings, notifications, and ECU operations. Admin permissions are applied to your managed account.</p>{auth.isSignedIn && user?.role === 'admin' ? <Link href="/admin" className="mt-7 flex h-12 items-center justify-center gap-2 bg-primary text-sm font-bold text-primary-foreground">CONTINUE TO ADMIN CONSOLE <ArrowRight size={15} /></Link> : <Link href="/sign-in" className="mt-7 flex h-12 items-center justify-center gap-2 bg-primary text-sm font-bold text-primary-foreground">SIGN IN AS ADMIN <LogIn size={15} /></Link>}{auth.isSignedIn && user?.role !== 'admin' && <p className="mt-4 text-center text-xs text-red-400">This account is not assigned the administrator role.</p>}<Link href="/" className="mt-5 flex items-center justify-center gap-2 text-xs font-semibold text-muted-foreground hover:text-primary"><ArrowLeft size={13} /> Back to marketplace</Link></div></div>;
 }
 
 function ProtectedPage({ children }: { children: ReactNode }) {
@@ -702,7 +769,7 @@ function ProtectedPage({ children }: { children: ReactNode }) {
 
 function AdminOnly({ children }: { children: ReactNode }) {
   const { user } = useWorkspaceUser();
-  if (localDemoMode && user?.role !== 'admin') return <Redirect to="/admin/login" />;
+  if (user?.role !== 'admin') return <Redirect to="/admin/login" />;
   return <>{children}</>;
 }
 
@@ -748,8 +815,15 @@ function BookingPage() {
 }
 
 function BookingsPage() {
-  const { bookings } = useAppState();
-  return <PageFrame><div className="px-5 py-12 lg:px-9 lg:py-20"><SectionLabel eyebrow="Customer portal / 02" title="My bookings." body="Payment, booking, location, and operation status stay visible after confirmation." /><div className="grid gap-4">{bookings.length === 0 ? <div className="border border-dashed border-border p-12 text-center"><ClipboardList className="mx-auto mb-3 text-muted-foreground" /><p className="font-semibold">No bookings yet.</p><Link href="/browse" className="mt-4 inline-flex items-center gap-2 text-xs font-bold text-primary">Browse equipment <ArrowRight size={14} /></Link></div> : bookings.map((booking) => <article key={booking.id} className="border border-border bg-card p-5"><div className="flex flex-col justify-between gap-5 md:flex-row md:items-start"><div><div className="mono-font text-[10px] text-primary">{booking.id} · {booking.createdAt.slice(0, 10)}</div><h2 className="mt-2 text-lg font-bold">{booking.equipmentName}</h2><div className="mt-2 flex flex-wrap gap-4 text-xs text-muted-foreground"><span className="flex items-center gap-1"><MapPin size={13} />{booking.location}</span><span className="flex items-center gap-1"><CalendarDays size={13} />24 Sep — 30 Sep 2026</span></div></div><div className="flex flex-wrap gap-2 text-[10px] font-bold uppercase"><span className="border border-emerald-400/30 bg-emerald-400/10 px-2 py-1 text-emerald-400">Payment {booking.paymentStatus}</span><span className="border border-primary/30 bg-primary/10 px-2 py-1 text-primary">{booking.status.replace('-', ' ')}</span></div></div><div className="mt-5 grid gap-3 border-t border-border pt-4 sm:grid-cols-4"><div><div className="text-[10px] text-muted-foreground">Total</div><div className="mt-1 font-bold text-primary">₹{fmt(booking.total)}</div></div><div><div className="text-[10px] text-muted-foreground">Next update</div><div className="mt-1 font-semibold">Owner confirmation</div></div><div><div className="text-[10px] text-muted-foreground">Location feed</div><div className="mt-1 font-semibold text-emerald-400">Ready</div></div><Link href="/notifications" className="flex items-center gap-2 text-xs font-bold text-primary sm:justify-end">VIEW STATUS <ArrowRight size={13} /></Link></div></article>)}</div></div></PageFrame>;
+  const { bookings, updateBooking, addNotification } = useAppState();
+  const cancelBooking = (booking: Booking) => {
+    const cancellationFee = Math.round(booking.total * 0.05);
+    const refundAmount = booking.total - cancellationFee;
+    updateBooking(booking.id, { status: 'cancelled', paymentStatus: 'refunded', cancellationFee, refundAmount });
+    addNotification({ title: 'Booking cancelled', body: `${booking.id} was cancelled. A 5% cancellation charge of ₹${fmt(cancellationFee)} was applied and ₹${fmt(refundAmount)} will be refunded.`, kind: 'booking', read: false });
+    addNotification({ title: 'Refund initiated', body: `Payment refund of ₹${fmt(refundAmount)} for ${booking.id} has been initiated.`, kind: 'payment', read: false });
+  };
+  return <PageFrame><div className="px-5 py-12 lg:px-9 lg:py-20"><SectionLabel eyebrow="Customer portal / 02" title="My bookings." body="Payment, booking, location, and operation status stay visible after confirmation." /><div className="grid gap-4">{bookings.length === 0 ? <div className="border border-dashed border-border p-12 text-center"><ClipboardList className="mx-auto mb-3 text-muted-foreground" /><p className="font-semibold">No bookings yet.</p><Link href="/browse" className="mt-4 inline-flex items-center gap-2 text-xs font-bold text-primary">Browse equipment <ArrowRight size={14} /></Link></div> : bookings.map((booking) => { const canCancel = ['payment-confirmed', 'confirmed'].includes(booking.status); return <article key={booking.id} className="border border-border bg-card p-5"><div className="flex flex-col justify-between gap-5 md:flex-row md:items-start"><div><div className="mono-font text-[10px] text-primary">{booking.id} · {booking.createdAt.slice(0, 10)}</div><h2 className="mt-2 text-lg font-bold">{booking.equipmentName}</h2><div className="mt-2 flex flex-wrap gap-4 text-xs text-muted-foreground"><span className="flex items-center gap-1"><MapPin size={13} />{booking.location}</span><span className="flex items-center gap-1"><CalendarDays size={13} />24 Sep — 30 Sep 2026</span></div></div><div className="flex flex-wrap gap-2 text-[10px] font-bold uppercase"><span className={`border px-2 py-1 ${booking.paymentStatus === 'refunded' ? 'border-sky-400/30 bg-sky-400/10 text-sky-300' : 'border-emerald-400/30 bg-emerald-400/10 text-emerald-400'}`}>Payment {booking.paymentStatus}</span><span className="border border-primary/30 bg-primary/10 px-2 py-1 text-primary">{booking.status.replace('-', ' ')}</span></div></div>{booking.status === 'cancelled' && <div className="mt-5 border-l-2 border-sky-400 bg-sky-400/10 p-3 text-xs text-muted-foreground">Cancellation charge: <b>₹{fmt(booking.cancellationFee ?? 0)}</b> · Refund: <b>₹{fmt(booking.refundAmount ?? 0)}</b></div>}<div className="mt-5 grid gap-3 border-t border-border pt-4 sm:grid-cols-4"><div><div className="text-[10px] text-muted-foreground">Total</div><div className="mt-1 font-bold text-primary">₹{fmt(booking.total)}</div></div><div><div className="text-[10px] text-muted-foreground">Next update</div><div className="mt-1 font-semibold">{booking.status === 'cancelled' ? 'Refund processing' : 'Owner confirmation'}</div></div><div><div className="text-[10px] text-muted-foreground">Location feed</div><div className="mt-1 font-semibold text-emerald-400">{booking.status === 'cancelled' ? 'Stopped' : 'Ready'}</div></div>{canCancel ? <button onClick={() => cancelBooking(booking)} className="text-left text-xs font-bold text-red-400 hover:text-red-300 sm:text-right">CANCEL BOOKING · 5% FEE</button> : <Link href="/notifications" className="flex items-center gap-2 text-xs font-bold text-primary sm:justify-end">VIEW STATUS <ArrowRight size={13} /></Link>}</div></article>; })}</div></div></PageFrame>;
 }
 
 function NotificationsPage() {
@@ -825,7 +899,7 @@ function NewListingPage() {
 }
 
 function AdminShell({ children }: { children: ReactNode }) {
-  return <PageFrame><div className="grid lg:grid-cols-[240px_1fr]"><aside className="border-b border-border bg-card p-5 lg:min-h-[calc(100dvh-72px)] lg:border-b-0 lg:border-r lg:p-6"><div className="mono-font text-[10px] uppercase tracking-wider text-primary">Admin console</div><h2 className="display-font mt-2 text-3xl font-bold uppercase">Control room</h2><nav className="mt-7 grid gap-1">{[['/admin', 'Overview', LayoutDashboard], ['/admin/users', 'Users', Users], ['/admin/bookings', 'Bookings', ReceiptText], ['/fleet', 'All fleet monitoring', Radio], ['/admin/sensors', 'ECU sensors', Gauge], ['/admin/notifications', 'Notifications', Bell]].map(([href, label, Icon]) => <Link key={href as string} href={href as string} className="flex items-center gap-3 px-3 py-3 text-xs font-semibold text-muted-foreground hover:bg-primary/10 hover:text-primary">{typeof Icon === 'function' ? <Icon size={15} /> : null}{label as string}</Link>)}</nav></aside><section className="min-w-0 px-5 py-10 lg:px-10 lg:py-14">{children}</section></div></PageFrame>;
+  return <PageFrame><div className="grid lg:grid-cols-[240px_1fr]"><aside className="border-b border-border bg-card p-5 lg:min-h-[calc(100dvh-72px)] lg:border-b-0 lg:border-r lg:p-6"><div className="mono-font text-[10px] uppercase tracking-wider text-primary">Admin console</div><h2 className="display-font mt-2 text-3xl font-bold uppercase">Control room</h2><nav className="mt-7 grid gap-1">{[['/admin', 'Overview', LayoutDashboard], ['/admin/users', 'Users', Users], ['/admin/bookings', 'Bookings', ReceiptText], ['/admin/payments', 'Payments', CreditCard], ['/fleet', 'All fleet monitoring', Radio], ['/admin/sensors', 'ECU sensors', Gauge], ['/admin/notifications', 'Notifications', Bell]].map(([href, label, Icon]) => <Link key={href as string} href={href as string} className="flex items-center gap-3 px-3 py-3 text-xs font-semibold text-muted-foreground hover:bg-primary/10 hover:text-primary">{typeof Icon === 'function' ? <Icon size={15} /> : null}{label as string}</Link>)}</nav></aside><section className="min-w-0 px-5 py-10 lg:px-10 lg:py-14">{children}</section></div></PageFrame>;
 }
 
 function AdminOverviewPage() {
@@ -840,6 +914,12 @@ function AdminUsersPage() {
 function AdminBookingsPage() {
   const { bookings } = useAppState();
   return <AdminShell><SectionLabel eyebrow="Admin / bookings" title="Booking states." body="Payment confirmation and booking confirmation remain separate operational events." /><div className="grid gap-3">{(bookings.length ? bookings : [{ id: 'RB-DEMO-01', equipmentName: 'CAT 320 Excavator', location: 'Whitefield', paymentStatus: 'paid', status: 'confirmed', total: 27000 } as Booking]).map((booking) => <div key={booking.id} className="flex flex-col justify-between gap-4 border border-border bg-card p-5 sm:flex-row sm:items-center"><div><div className="mono-font text-[10px] text-primary">{booking.id}</div><h3 className="mt-2 font-bold">{booking.equipmentName}</h3><div className="mt-1 text-xs text-muted-foreground">{booking.location}</div></div><div className="flex flex-wrap gap-2 text-[10px] font-bold uppercase"><span className="border border-emerald-400/30 bg-emerald-400/10 px-2 py-1 text-emerald-400">Payment {booking.paymentStatus}</span><span className="border border-primary/30 bg-primary/10 px-2 py-1 text-primary">{booking.status.replace('-', ' ')}</span><span className="px-2 py-1 text-primary">₹{fmt(booking.total)}</span></div></div>)}</div></AdminShell>;
+}
+
+function AdminPaymentsPage() {
+  const { bookings } = useAppState();
+  const rows = bookings.length ? bookings : [{ id: 'RB-DEMO-01', equipmentName: 'CAT 320 Excavator', paymentMethod: 'UPI / VPA', paymentStatus: 'paid', total: 27000, status: 'confirmed' } as Booking];
+  return <AdminShell><SectionLabel eyebrow="Admin / payments" title="Payment operations." body="Review captured, pending, and refunded payment states alongside every booking." /><div className="overflow-x-auto border border-border bg-card"><table className="w-full min-w-[760px] text-left text-xs"><thead className="border-b border-border text-[10px] uppercase tracking-wider text-muted-foreground"><tr><th className="p-4">Booking</th><th className="p-4">Method</th><th className="p-4">Booking state</th><th className="p-4">Payment state</th><th className="p-4 text-right">Amount</th></tr></thead><tbody>{rows.map((booking) => <tr key={booking.id} className="border-b border-border last:border-0"><td className="p-4"><b>{booking.id}</b><div className="mt-1 text-muted-foreground">{booking.equipmentName}</div></td><td className="p-4 text-muted-foreground">{booking.paymentMethod}</td><td className="p-4">{booking.status.replace('-', ' ')}</td><td className={`p-4 font-bold ${booking.paymentStatus === 'refunded' ? 'text-sky-300' : booking.paymentStatus === 'paid' ? 'text-emerald-400' : 'text-primary'}`}>{booking.paymentStatus}</td><td className="p-4 text-right font-bold text-primary">₹{fmt(booking.total)}</td></tr>)}</tbody></table></div></AdminShell>;
 }
 
 function AdminSensorsPage() {
@@ -879,7 +959,7 @@ function Router() {
   const auth = useWorkspaceAuth();
   const [location] = useLocation();
   if (localDemoMode && !auth.isSignedIn && !location.startsWith('/sign-in') && !location.startsWith('/sign-up') && !location.startsWith('/admin/login')) return <Redirect to="/sign-in" />;
-  return <Switch><Route path="/" component={HomePage} /><Route path="/sign-in/*?" component={() => <AuthPage mode="sign-in" />} /><Route path="/sign-up/*?" component={() => <AuthPage mode="sign-up" />} /><Route path="/admin/login" component={AdminLoginPage} /><Route path="/browse" component={BrowsePage} /><Route path="/how-it-works" component={HowItWorksPage} /><Route path="/booking/:id" component={() => <ProtectedPage><BookingPage /></ProtectedPage>} /><Route path="/bookings" component={() => <ProtectedPage><BookingsPage /></ProtectedPage>} /><Route path="/notifications" component={() => <ProtectedPage><NotificationsPage /></ProtectedPage>} /><Route path="/profile" component={() => <ProtectedPage><ProfilePage /></ProtectedPage>} /><Route path="/favorites" component={() => <ProtectedPage><FavoritesPage /></ProtectedPage>} /><Route path="/fleet" component={() => <OwnerOrAdmin><FleetPage /></OwnerOrAdmin>} /><Route path="/owner/dashboard" component={() => <OwnerOrAdmin><OwnerDashboardPage /></OwnerOrAdmin>} /><Route path="/owner/listings" component={() => <OwnerOrAdmin><OwnerListingsPage /></OwnerOrAdmin>} /><Route path="/owner/listings/new" component={() => <OwnerOrAdmin><NewListingPage /></OwnerOrAdmin>} /><Route path="/admin" component={() => <AdminOnly><AdminOverviewPage /></AdminOnly>} /><Route path="/admin/users" component={() => <AdminOnly><AdminUsersPage /></AdminOnly>} /><Route path="/admin/bookings" component={() => <AdminOnly><AdminBookingsPage /></AdminOnly>} /><Route path="/admin/sensors" component={() => <AdminOnly><AdminSensorsPage /></AdminOnly>} /><Route path="/admin/notifications" component={() => <AdminOnly><AdminNotificationsPage /></AdminOnly>} /><Route component={NotFound} /></Switch>;
+  return <Switch><Route path="/" component={HomePage} /><Route path="/sign-in/*?" component={() => <AuthPage mode="sign-in" />} /><Route path="/sign-up/*?" component={() => <AuthPage mode="sign-up" />} /><Route path="/admin/login" component={AdminLoginPage} /><Route path="/browse" component={BrowsePage} /><Route path="/how-it-works" component={HowItWorksPage} /><Route path="/booking/:id" component={() => <ProtectedPage><BookingPage /></ProtectedPage>} /><Route path="/bookings" component={() => <ProtectedPage><BookingsPage /></ProtectedPage>} /><Route path="/notifications" component={() => <ProtectedPage><NotificationsPage /></ProtectedPage>} /><Route path="/profile" component={() => <ProtectedPage><ProfilePage /></ProtectedPage>} /><Route path="/favorites" component={() => <ProtectedPage><FavoritesPage /></ProtectedPage>} /><Route path="/fleet" component={() => <OwnerOrAdmin><FleetPage /></OwnerOrAdmin>} /><Route path="/owner/dashboard" component={() => <OwnerOrAdmin><OwnerDashboardPage /></OwnerOrAdmin>} /><Route path="/owner/listings" component={() => <OwnerOrAdmin><OwnerListingsPage /></OwnerOrAdmin>} /><Route path="/owner/listings/new" component={() => <OwnerOrAdmin><NewListingPage /></OwnerOrAdmin>} /><Route path="/admin" component={() => <AdminOnly><AdminOverviewPage /></AdminOnly>} /><Route path="/admin/users" component={() => <AdminOnly><AdminUsersPage /></AdminOnly>} /><Route path="/admin/bookings" component={() => <AdminOnly><AdminBookingsPage /></AdminOnly>} /><Route path="/admin/payments" component={() => <AdminOnly><AdminPaymentsPage /></AdminOnly>} /><Route path="/admin/sensors" component={() => <AdminOnly><AdminSensorsPage /></AdminOnly>} /><Route path="/admin/notifications" component={() => <AdminOnly><AdminNotificationsPage /></AdminOnly>} /><Route component={NotFound} /></Switch>;
 }
 
 const clerkAppearance = {

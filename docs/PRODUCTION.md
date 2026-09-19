@@ -19,6 +19,16 @@ must be configured in Razorpay and signed with `RAZORPAY_WEBHOOK_SECRET`. The re
 information supplied for the business belongs in a private Razorpay/settlement configuration or
 Azure Key Vault, never in frontend source, logs, or this repository.
 
+Administrator credentials are separate from customer credentials. Set `ADMIN_USER_ID` and
+`ADMIN_PASSWORD` only on the API server; never expose production administrator credentials as
+`VITE_*` variables. The admin console provides overview, users, bookings, payments, fleet,
+ECU sensors, and notification views.
+
+Cancellation flow: call `POST /bookings/:bookingId/cancel` as the booking customer before the
+booking enters transit. The API records a 5% cancellation charge, marks the payment refunded,
+stores the net refund, and creates notification records. Configure Resend and Twilio variables
+from `.env.example` to deliver the same booking and payment events by email and SMS.
+
 ## Local deployment
 
 Copy `.env.example` to `.env`, set secrets, install dependencies with pnpm, and run the frontend
