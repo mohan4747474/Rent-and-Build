@@ -1,0 +1,6 @@
+<svg width="160" height="44" viewBox="0 0 160 44" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Rent and Build">
+  <rect width="160" height="44" rx="2" fill="#171c28"/>
+  <path d="M22 5 39 37H5L22 5Z" fill="#f3b62d"/>
+  <text x="22" y="31" fill="#171c28" font-family="Arial,sans-serif" font-size="10" font-weight="800" text-anchor="middle">RB</text>
+  <text x="49" y="28" fill="#f7f2e8" font-family="Arial,sans-serif" font-size="16" font-weight="800">RENT &amp; BUILD</text>
+</svg>

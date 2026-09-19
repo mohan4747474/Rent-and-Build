@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Rent & Build India"
+description = "A responsive construction equipment rental marketplace for contractors, equipment owners, and operators, with search, booking, payments, fleet tracking, and admin visibility."
+version = "1.0.0"
+id = "artifacts/rentbuild-india"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 20232
+
+[services.development]
+run = "pnpm --filter @workspace/rentbuild-india run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/rentbuild-india", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/rentbuild-india/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "20232"
+BASE_PATH = "/"
