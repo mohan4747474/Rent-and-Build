@@ -7,19 +7,13 @@
     <option name="selectedModelId" value="auto" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="9ac49d6c-4bf9-487d-9639-5b8d44fba6b9" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/artifacts/api-server/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/artifacts/api-server/package.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/artifacts/api-server/src/app.ts" beforeDir="false" afterPath="$PROJECT_DIR$/artifacts/api-server/src/app.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/artifacts/api-server/src/index.ts" beforeDir="false" afterPath="$PROJECT_DIR$/artifacts/api-server/src/index.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/artifacts/api-server/src/routes/index.ts" beforeDir="false" afterPath="$PROJECT_DIR$/artifacts/api-server/src/routes/index.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/artifacts/mockup-sandbox/mockupPreviewPlugin.ts" beforeDir="false" afterPath="$PROJECT_DIR$/artifacts/mockup-sandbox/mockupPreviewPlugin.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/artifacts/rentbuild-india/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/artifacts/rentbuild-india/package.json" afterDir="false" />
+    <list default="true" id="9ac49d6c-4bf9-487d-9639-5b8d44fba6b9" name="Changes" comment="application first push">
+      <change beforePath="$PROJECT_DIR$/.env.example" beforeDir="false" afterPath="$PROJECT_DIR$/.env.example" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/artifacts/api-server/src/routes/auth.ts" beforeDir="false" afterPath="$PROJECT_DIR$/artifacts/api-server/src/routes/auth.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/artifacts/api-server/src/routes/tracking.ts" beforeDir="false" afterPath="$PROJECT_DIR$/artifacts/api-server/src/routes/tracking.ts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/artifacts/rentbuild-india/src/App.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/artifacts/rentbuild-india/src/App.tsx" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/artifacts/rentbuild-india/vite.config.ts" beforeDir="false" afterPath="$PROJECT_DIR$/artifacts/rentbuild-india/vite.config.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/api-spec/openapi.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/lib/api-spec/openapi.yaml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/db/src/schema/index.ts" beforeDir="false" afterPath="$PROJECT_DIR$/lib/db/src/schema/index.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/pnpm-lock.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/pnpm-lock.yaml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/pnpm-workspace.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/pnpm-workspace.yaml" afterDir="false" />
     </list>
@@ -181,10 +175,23 @@
       <option name="presentableId" value="Default" />
       <updated>1789801106936</updated>
     </task>
+    <task id="LOCAL-00001" summary="application first push">
+      <option name="closed" value="true" />
+      <created>1789813767093</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1789813767094</updated>
+    </task>
+    <option name="localTasksCounter" value="2" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="application first push" />
+    <option name="LAST_COMMIT_MESSAGE" value="application first push" />
   </component>
   <component name="XSLT-Support.FileAssociations.UIState">
     <expand />
