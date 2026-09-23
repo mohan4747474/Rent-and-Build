@@ -10,9 +10,9 @@
     <option name="selectedModelId" value="auto" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="9ac49d6c-4bf9-487d-9639-5b8d44fba6b9" name="Changes" comment="host change">
+    <list default="true" id="9ac49d6c-4bf9-487d-9639-5b8d44fba6b9" name="Changes" comment="google map integreation">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/artifacts/rentbuild-india/src/App.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/artifacts/rentbuild-india/src/App.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/db/src/schema/index.ts" beforeDir="false" afterPath="$PROJECT_DIR$/lib/db/src/schema/index.ts" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -273,7 +273,8 @@
     <MESSAGE value="application first push" />
     <MESSAGE value="application  push" />
     <MESSAGE value="host change" />
-    <option name="LAST_COMMIT_MESSAGE" value="host change" />
+    <MESSAGE value="google map integreation" />
+    <option name="LAST_COMMIT_MESSAGE" value="google map integreation" />
   </component>
   <component name="XSLT-Support.FileAssociations.UIState">
     <expand />
