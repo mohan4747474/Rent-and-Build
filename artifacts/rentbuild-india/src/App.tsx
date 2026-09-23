@@ -106,6 +106,7 @@ const LocalAuthContext = createContext<{
   isLoaded: boolean;
   isSignedIn: boolean;
   user: WorkspaceUser | null;
+  accounts: LocalAccount[];
   register: (user: WorkspaceUser, password?: string) => void;
   login: (userId: string, password: string) => WorkspaceUser | null;
   signOut: () => void;
@@ -145,18 +146,18 @@ function LocalAuthProvider({ children }: { children: ReactNode }) {
   const [accounts, setAccounts] = useStoredState<LocalAccount[]>('rb-local-accounts', [
     {
       fullName: 'RentBuild Administrator',
-      primaryEmailAddress: { emailAddress: 'ADMIN@GMAIL.COM' },
+      primaryEmailAddress: { emailAddress: 'admin@rentbuild.in' },
       role: 'admin',
-      password: 'ADMIN12345',
+      password: 'Admin2026',
     },
   ]);
   useEffect(() => {
-    if (!accounts.some((account) => account.primaryEmailAddress.emailAddress.toLowerCase() === 'admin@gmail.com')) {
+    if (!accounts.some((account) => account.primaryEmailAddress.emailAddress.toLowerCase() === 'admin@rentbuild.in')) {
       setAccounts((current) => [...current, {
         fullName: 'RentBuild Administrator',
-        primaryEmailAddress: { emailAddress: 'ADMIN@GMAIL.COM' },
+        primaryEmailAddress: { emailAddress: 'admin@rentbuild.in' },
         role: 'admin',
-        password: 'ADMIN12345',
+        password: 'Admin2026',
       }]);
     }
   }, [accounts, setAccounts]);
@@ -164,6 +165,7 @@ function LocalAuthProvider({ children }: { children: ReactNode }) {
     isLoaded: true,
     isSignedIn: Boolean(user),
     user,
+    accounts,
     register: (nextUser: WorkspaceUser, password = '') => {
       setAccounts((current) => {
         const withoutExisting = current.filter((account) => account.primaryEmailAddress.emailAddress.toLowerCase() !== nextUser.primaryEmailAddress.emailAddress.toLowerCase());
@@ -234,168 +236,9 @@ type SensorData = {
   lastSync: string;
 };
 
-const equipmentSeed: Equipment[] = [
-  {
-    id: 'cat-320',
-    name: 'CAT 320 Excavator',
-    type: 'Excavator',
-    city: 'Bengaluru',
-    rating: '4.9',
-    reviews: 28,
-    price: 4500,
-    image: 'excavator',
-    tag: 'Most booked',
-    available: 'Today',
-    owner: 'Kumar Earthmovers',
-    operatorIncluded: true,
-  },
-  {
-    id: 'volvo-a40',
-    name: 'Volvo A40 Articulated Dump Truck',
-    type: 'Dump truck',
-    city: 'Hyderabad',
-    rating: '4.8',
-    reviews: 16,
-    price: 6800,
-    image: 'dump',
-    tag: 'New listing',
-    available: 'Tomorrow',
-    owner: 'Deccan Haulage',
-    operatorIncluded: false,
-  },
-  {
-    id: 'liebherr',
-    name: 'Liebherr LTM 1090 Mobile Crane',
-    type: 'Crane',
-    city: 'Mumbai',
-    rating: '4.9',
-    reviews: 11,
-    price: 12500,
-    image: 'crane',
-    tag: 'Operator included',
-    available: 'In 2 days',
-    owner: 'Harbour Lift Co.',
-    operatorIncluded: true,
-  },
-  {
-    id: 'jcb-3dx',
-    name: 'JCB 3DX Backhoe Loader',
-    type: 'Loader',
-    city: 'Chennai',
-    rating: '4.7',
-    reviews: 34,
-    price: 3900,
-    image: 'loader',
-    tag: 'Verified owner',
-    available: 'Today',
-    owner: 'Southline Machines',
-    operatorIncluded: true,
-  },
-  {
-    id: 'cummins-125',
-    name: 'Cummins 125 kVA Generator',
-    type: 'Generator',
-    city: 'Pune',
-    rating: '4.8',
-    reviews: 19,
-    price: 2400,
-    image: 'generator',
-    tag: 'Quiet set',
-    available: 'Today',
-    owner: 'Power Yard India',
-    operatorIncluded: false,
-  },
-];
-
-const defaultNotifications: AppNotification[] = [
-  {
-    id: 'n1',
-    title: 'Fleet location updated',
-    body: 'CAT 320 is moving toward Whitefield work site.',
-    kind: 'location',
-    time: '2 min ago',
-    read: false,
-  },
-  {
-    id: 'n2',
-    title: 'Payment confirmation ready',
-    body: 'Your next booking will show payment and booking as separate steps.',
-    kind: 'payment',
-    time: 'Today',
-    read: false,
-  },
-  {
-    id: 'n3',
-    title: 'ECU sensor sync online',
-    body: 'Temperature, mileage and operating hours are available for connected assets.',
-    kind: 'operation',
-    time: 'Today',
-    read: true,
-  },
-];
-
-const defaultSensors: Record<string, SensorData> = {
-  'cat-320': {
-    temperature: 82.4,
-    mileage: 777.37,
-    workHours: 53.09,
-    kmDriven: 0,
-    fuel: 78.4,
-    odometerKm: 18420,
-    latitude: 12.9716,
-    longitude: 77.5946,
-    speedKph: 18.4,
-    engineRpm: 1420,
-    engineLoad: 62,
-    batteryVoltage: 24.8,
-    oilPressure: 4.2,
-    hydraulicPressure: 238,
-    coolantLevel: 91,
-    fuelRate: 8.6,
-    engineStatus: 'Running',
-    lastSync: '18 seconds ago',
-  },
-  'volvo-a40': {
-    temperature: 76.2,
-    mileage: 0,
-    workHours: 418.3,
-    kmDriven: 184.7,
-    fuel: 62.1,
-    odometerKm: 48210,
-    latitude: 17.385,
-    longitude: 78.4867,
-    speedKph: 12.1,
-    engineRpm: 1180,
-    engineLoad: 48,
-    batteryVoltage: 25.1,
-    oilPressure: 3.8,
-    hydraulicPressure: 221,
-    coolantLevel: 88,
-    fuelRate: 12.4,
-    engineStatus: 'Idle',
-    lastSync: '42 seconds ago',
-  },
-  'liebherr': {
-    temperature: 69.5,
-    mileage: 112.2,
-    workHours: 214.8,
-    kmDriven: 0,
-    fuel: 91.8,
-    odometerKm: 9210,
-    latitude: 19.076,
-    longitude: 72.8777,
-    speedKph: 0,
-    engineRpm: 0,
-    engineLoad: 0,
-    batteryVoltage: 25.4,
-    oilPressure: 0,
-    hydraulicPressure: 0,
-    coolantLevel: 95,
-    fuelRate: 0,
-    engineStatus: 'Stopped',
-    lastSync: '1 minute ago',
-  },
-};
+const equipmentSeed: Equipment[] = [];
+const defaultNotifications: AppNotification[] = [];
+const defaultSensors: Record<string, SensorData> = {};
 
 const fmt = (value: number) => new Intl.NumberFormat('en-IN').format(value);
 
@@ -459,6 +302,11 @@ function AppStateProvider({ children }: { children: ReactNode }) {
     'rb-sensors',
     defaultSensors,
   );
+  useEffect(() => {
+    setEquipment((current) => current.filter((item) => !['cat-320', 'volvo-a40', 'liebherr', 'jcb-3dx', 'cummins-125'].includes(item.id)));
+    setNotifications((current) => current.filter((item) => !['n1', 'n2', 'n3'].includes(item.id)));
+    setSensors((current) => Object.fromEntries(Object.entries(current).filter(([id]) => !['cat-320', 'volvo-a40', 'liebherr'].includes(id))));
+  }, [setEquipment, setNotifications, setSensors]);
 
   const addNotification = (notification: Omit<AppNotification, 'id' | 'time'>) => {
     setNotifications((current) => [
@@ -748,8 +596,14 @@ function AdminLoginPage() {
   const [error, setError] = useState('');
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    if (localDemoMode && form.userId.trim().toLowerCase() === (import.meta.env.VITE_ADMIN_USER_ID || 'ADMIN@GMAIL.COM').toLowerCase() && form.password === (import.meta.env.VITE_ADMIN_PASSWORD || 'ADMIN12345')) {
-      local?.login(form.userId, form.password);
+    const adminUserId = (import.meta.env.VITE_ADMIN_USER_ID || 'admin@rentbuild.in').toLowerCase();
+    const adminPassword = import.meta.env.VITE_ADMIN_PASSWORD || 'Admin2026';
+    if (localDemoMode && form.userId.trim().toLowerCase() === adminUserId && form.password === adminPassword) {
+      local?.register({
+        fullName: 'RentBuild Administrator',
+        primaryEmailAddress: { emailAddress: adminUserId },
+        role: 'admin',
+      }, adminPassword);
       window.location.href = `${basePath}/admin`;
       return;
     }
@@ -904,22 +758,25 @@ function AdminShell({ children }: { children: ReactNode }) {
 
 function AdminOverviewPage() {
   const { equipment, bookings, notifications } = useAppState();
-  return <AdminShell><SectionLabel eyebrow="Admin / overview" title="Marketplace control room." body="A separate operational view for users, bookings, ECU feeds, and notification health." /><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{[['1,284', 'Users', Users], [String(bookings.length + 33), 'Total bookings', ReceiptText], [String(equipment.length), 'Active assets', Truck], [String(notifications.length), 'Notification events', Bell]].map(([value, label, Icon]) => <div key={label as string} className="border border-border bg-card p-5"><div className="flex items-center justify-between"><span className="mono-font text-2xl font-bold text-primary">{value as string}</span>{typeof Icon === 'function' ? <Icon size={17} className="text-primary" /> : null}</div><div className="mt-2 text-xs text-muted-foreground">{label as string}</div></div>)}</div><div className="mt-8 grid gap-4 lg:grid-cols-2"><div className="border border-border bg-card p-5"><h3 className="text-sm font-bold">Service health</h3><div className="mt-4 grid gap-3">{[['Clerk auth', 'Operational'], ['Booking state engine', 'Operational'], ['ECU bridge', 'Preview connected'], ['Notification dispatcher', 'Operational']].map(([label, state]) => <div key={label} className="flex items-center justify-between border-b border-border pb-3 text-xs last:border-0 last:pb-0"><span>{label}</span><span className="flex items-center gap-2 text-emerald-400"><span className="h-2 w-2 rounded-full bg-emerald-400" />{state}</span></div>)}</div></div><div className="border border-border bg-card p-5"><h3 className="text-sm font-bold">Recent activity</h3><div className="mt-4 grid gap-3">{notifications.slice(0, 4).map((item) => <div key={item.id} className="flex gap-3 border-b border-border pb-3 text-xs last:border-0 last:pb-0"><Activity size={14} className="mt-0.5 text-primary" /><div><b>{item.title}</b><div className="mt-1 text-muted-foreground">{item.time}</div></div></div>)}</div></div></div></AdminShell>;
+  const local = useContext(LocalAuthContext);
+  const cards = [[String(local?.accounts.length ?? 0), 'Users', Users], [String(bookings.length), 'Total bookings', ReceiptText], [String(equipment.length), 'Active assets', Truck], [String(notifications.length), 'Notification events', Bell]] as const;
+  return <AdminShell><SectionLabel eyebrow="Admin / overview" title="Marketplace control room." body="Counts and activity shown here come only from currently available application data." /><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{cards.map(([value, label, Icon]) => <div key={label} className="border border-border bg-card p-5"><div className="flex items-center justify-between"><span className="mono-font text-2xl font-bold text-primary">{value}</span><Icon size={17} className="text-primary" /></div><div className="mt-2 text-xs text-muted-foreground">{label}</div></div>)}</div><div className="mt-8 border border-border bg-card p-5"><h3 className="text-sm font-bold">Recent activity</h3>{notifications.length === 0 ? <p className="mt-4 text-xs text-muted-foreground">No activity has been recorded.</p> : <div className="mt-4 grid gap-3">{notifications.slice(0, 4).map((item) => <div key={item.id} className="flex gap-3 border-b border-border pb-3 text-xs last:border-0 last:pb-0"><Activity size={14} className="mt-0.5 text-primary" /><div><b>{item.title}</b><div className="mt-1 text-muted-foreground">{item.time}</div></div></div>)}</div>}</div></AdminShell>;
 }
 
 function AdminUsersPage() {
-  return <AdminShell><SectionLabel eyebrow="Admin / users" title="Users and roles." body="Separate customer, equipment owner, operator, and administrator access surfaces." /><div className="overflow-x-auto border border-border bg-card"><table className="w-full min-w-[640px] text-left text-xs"><thead className="border-b border-border text-[10px] uppercase tracking-wider text-muted-foreground"><tr><th className="p-4">User</th><th className="p-4">Role</th><th className="p-4">Status</th><th className="p-4">Last active</th></tr></thead><tbody>{[['Ananya Rao', 'Customer', 'Verified', '2 min ago'], ['Kumar Earthmovers', 'Owner', 'Verified', '12 min ago'], ['Ravi Operator', 'Operator', 'On shift', '18 min ago'], ['Admin workspace', 'Admin', 'Protected', 'Now']].map(([name, role, status, last]) => <tr key={name} className="border-b border-border last:border-0"><td className="p-4 font-semibold">{name}</td><td className="p-4 text-muted-foreground">{role}</td><td className="p-4 text-emerald-400">{status}</td><td className="p-4 text-muted-foreground">{last}</td></tr>)}</tbody></table></div></AdminShell>;
+  const local = useContext(LocalAuthContext);
+  return <AdminShell><SectionLabel eyebrow="Admin / users" title="Users and roles." body="Only accounts currently available in this workspace are shown." /><div className="overflow-x-auto border border-border bg-card">{local?.accounts.length ? <table className="w-full min-w-[640px] text-left text-xs"><thead className="border-b border-border text-[10px] uppercase tracking-wider text-muted-foreground"><tr><th className="p-4">User</th><th className="p-4">Role</th><th className="p-4">Status</th></tr></thead><tbody>{local.accounts.map((account) => <tr key={account.primaryEmailAddress.emailAddress} className="border-b border-border last:border-0"><td className="p-4 font-semibold">{account.fullName}<div className="mt-1 text-muted-foreground">{account.primaryEmailAddress.emailAddress}</div></td><td className="p-4 text-muted-foreground">{account.role}</td><td className="p-4 text-emerald-400">Available</td></tr>)}</tbody></table> : <p className="p-8 text-center text-xs text-muted-foreground">No user accounts are available.</p>}</div></AdminShell>;
 }
 
 function AdminBookingsPage() {
   const { bookings } = useAppState();
-  return <AdminShell><SectionLabel eyebrow="Admin / bookings" title="Booking states." body="Payment confirmation and booking confirmation remain separate operational events." /><div className="grid gap-3">{(bookings.length ? bookings : [{ id: 'RB-DEMO-01', equipmentName: 'CAT 320 Excavator', location: 'Whitefield', paymentStatus: 'paid', status: 'confirmed', total: 27000 } as Booking]).map((booking) => <div key={booking.id} className="flex flex-col justify-between gap-4 border border-border bg-card p-5 sm:flex-row sm:items-center"><div><div className="mono-font text-[10px] text-primary">{booking.id}</div><h3 className="mt-2 font-bold">{booking.equipmentName}</h3><div className="mt-1 text-xs text-muted-foreground">{booking.location}</div></div><div className="flex flex-wrap gap-2 text-[10px] font-bold uppercase"><span className="border border-emerald-400/30 bg-emerald-400/10 px-2 py-1 text-emerald-400">Payment {booking.paymentStatus}</span><span className="border border-primary/30 bg-primary/10 px-2 py-1 text-primary">{booking.status.replace('-', ' ')}</span><span className="px-2 py-1 text-primary">₹{fmt(booking.total)}</span></div></div>)}</div></AdminShell>;
+  return <AdminShell><SectionLabel eyebrow="Admin / bookings" title="Booking states." body="Payment confirmation and booking confirmation remain separate operational events." /><div className="grid gap-3">{bookings.length ? bookings.map((booking) => <div key={booking.id} className="flex flex-col justify-between gap-4 border border-border bg-card p-5 sm:flex-row sm:items-center"><div><div className="mono-font text-[10px] text-primary">{booking.id}</div><h3 className="mt-2 font-bold">{booking.equipmentName}</h3><div className="mt-1 text-xs text-muted-foreground">{booking.location}</div></div><div className="flex flex-wrap gap-2 text-[10px] font-bold uppercase"><span className="border border-emerald-400/30 bg-emerald-400/10 px-2 py-1 text-emerald-400">Payment {booking.paymentStatus}</span><span className="border border-primary/30 bg-primary/10 px-2 py-1 text-primary">{booking.status.replace('-', ' ')}</span><span className="px-2 py-1 text-primary">₹{fmt(booking.total)}</span></div></div>) : <p className="border border-dashed border-border p-8 text-center text-xs text-muted-foreground">No bookings are available.</p>}</div></AdminShell>;
 }
 
 function AdminPaymentsPage() {
   const { bookings } = useAppState();
-  const rows = bookings.length ? bookings : [{ id: 'RB-DEMO-01', equipmentName: 'CAT 320 Excavator', paymentMethod: 'UPI / VPA', paymentStatus: 'paid', total: 27000, status: 'confirmed' } as Booking];
-  return <AdminShell><SectionLabel eyebrow="Admin / payments" title="Payment operations." body="Review captured, pending, and refunded payment states alongside every booking." /><div className="overflow-x-auto border border-border bg-card"><table className="w-full min-w-[760px] text-left text-xs"><thead className="border-b border-border text-[10px] uppercase tracking-wider text-muted-foreground"><tr><th className="p-4">Booking</th><th className="p-4">Method</th><th className="p-4">Booking state</th><th className="p-4">Payment state</th><th className="p-4 text-right">Amount</th></tr></thead><tbody>{rows.map((booking) => <tr key={booking.id} className="border-b border-border last:border-0"><td className="p-4"><b>{booking.id}</b><div className="mt-1 text-muted-foreground">{booking.equipmentName}</div></td><td className="p-4 text-muted-foreground">{booking.paymentMethod}</td><td className="p-4">{booking.status.replace('-', ' ')}</td><td className={`p-4 font-bold ${booking.paymentStatus === 'refunded' ? 'text-sky-300' : booking.paymentStatus === 'paid' ? 'text-emerald-400' : 'text-primary'}`}>{booking.paymentStatus}</td><td className="p-4 text-right font-bold text-primary">₹{fmt(booking.total)}</td></tr>)}</tbody></table></div></AdminShell>;
+  const rows = bookings;
+  return <AdminShell><SectionLabel eyebrow="Admin / payments" title="Payment operations." body="Review captured, pending, and refunded payment states alongside every booking." /><div className="overflow-x-auto border border-border bg-card">{rows.length ? <table className="w-full min-w-[760px] text-left text-xs"><thead className="border-b border-border text-[10px] uppercase tracking-wider text-muted-foreground"><tr><th className="p-4">Booking</th><th className="p-4">Method</th><th className="p-4">Booking state</th><th className="p-4">Payment state</th><th className="p-4 text-right">Amount</th></tr></thead><tbody>{rows.map((booking) => <tr key={booking.id} className="border-b border-border last:border-0"><td className="p-4"><b>{booking.id}</b><div className="mt-1 text-muted-foreground">{booking.equipmentName}</div></td><td className="p-4 text-muted-foreground">{booking.paymentMethod}</td><td className="p-4">{booking.status.replace('-', ' ')}</td><td className={`p-4 font-bold ${booking.paymentStatus === 'refunded' ? 'text-sky-300' : booking.paymentStatus === 'paid' ? 'text-emerald-400' : 'text-primary'}`}>{booking.paymentStatus}</td><td className="p-4 text-right font-bold text-primary">₹{fmt(booking.total)}</td></tr>)}</tbody></table> : <p className="p-8 text-center text-xs text-muted-foreground">No payment records are available.</p>}</div></AdminShell>;
 }
 
 function AdminSensorsPage() {
@@ -929,7 +786,7 @@ function AdminSensorsPage() {
 
 function AdminNotificationsPage() {
   const { notifications } = useAppState();
-  return <AdminShell><SectionLabel eyebrow="Admin / notifications" title="Dispatcher log." body="A central feed for booking, payment, location, and operation events." /><div className="border border-border bg-card">{notifications.map((item) => <div key={item.id} className="flex gap-4 border-b border-border p-5 last:border-0"><Bell size={15} className="mt-1 text-primary" /><div><div className="text-sm font-bold">{item.title}</div><div className="mt-1 text-xs text-muted-foreground">{item.body}</div></div><span className="ml-auto text-[10px] text-muted-foreground">{item.time}</span></div>)}</div></AdminShell>;
+  return <AdminShell><SectionLabel eyebrow="Admin / notifications" title="Dispatcher log." body="A central feed for booking, payment, location, and operation events." /><div className="border border-border bg-card">{notifications.length ? notifications.map((item) => <div key={item.id} className="flex gap-4 border-b border-border p-5 last:border-0"><Bell size={15} className="mt-1 text-primary" /><div><div className="text-sm font-bold">{item.title}</div><div className="mt-1 text-xs text-muted-foreground">{item.body}</div></div><span className="ml-auto text-[10px] text-muted-foreground">{item.time}</span></div>) : <p className="p-8 text-center text-xs text-muted-foreground">No notification events are available.</p>}</div></AdminShell>;
 }
 
 function SignOutButton({ compact = false }: { compact?: boolean }) {

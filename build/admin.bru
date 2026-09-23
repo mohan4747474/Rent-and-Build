@@ -5,11 +5,12 @@ meta {
 }
 
 get {
-    url: Authorization: Bearer {{adminToken}}
-2
-api/admin/users
-body: none
-auth: inherit
+  url: http://localhost:3000/api/admin/login
+  method: POST
+  body: {
+    "email": "admin@example.com",
+    "password": "admin123"
+  }
 }
 settings {
     encodeurl: true
