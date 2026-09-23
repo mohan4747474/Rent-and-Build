@@ -10,15 +10,9 @@
     <option name="selectedModelId" value="auto" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="9ac49d6c-4bf9-487d-9639-5b8d44fba6b9" name="Changes" comment="application  push">
-      <change beforePath="$PROJECT_DIR$/.env" beforeDir="false" afterPath="$PROJECT_DIR$/.env" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.env.example" beforeDir="false" afterPath="$PROJECT_DIR$/.env.example" afterDir="false" />
+    <list default="true" id="9ac49d6c-4bf9-487d-9639-5b8d44fba6b9" name="Changes" comment="host change">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/artifacts/rentbuild-india/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/artifacts/rentbuild-india/package.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/artifacts/rentbuild-india/src/App.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/artifacts/rentbuild-india/src/App.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/build/admin.bru" beforeDir="false" afterPath="$PROJECT_DIR$/build/admin.bru" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pnpm-lock.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/pnpm-lock.yaml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pnpm-workspace.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/pnpm-workspace.yaml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -278,7 +272,8 @@
   <component name="VcsManagerConfiguration">
     <MESSAGE value="application first push" />
     <MESSAGE value="application  push" />
-    <option name="LAST_COMMIT_MESSAGE" value="application  push" />
+    <MESSAGE value="host change" />
+    <option name="LAST_COMMIT_MESSAGE" value="host change" />
   </component>
   <component name="XSLT-Support.FileAssociations.UIState">
     <expand />
