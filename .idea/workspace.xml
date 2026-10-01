@@ -11,8 +11,16 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="9ac49d6c-4bf9-487d-9639-5b8d44fba6b9" name="Changes" comment="listing changes">
+      <change beforePath="$PROJECT_DIR$/.idea/compiler.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/compiler.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/db/src/schema/index.ts" beforeDir="false" afterPath="$PROJECT_DIR$/lib/db/src/schema/index.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/artifacts/api-server/src/middlewares/auth.ts" beforeDir="false" afterPath="$PROJECT_DIR$/artifacts/api-server/src/middlewares/auth.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/artifacts/api-server/src/routes/auth.ts" beforeDir="false" afterPath="$PROJECT_DIR$/artifacts/api-server/src/routes/auth.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/artifacts/api-server/src/routes/bookings.ts" beforeDir="false" afterPath="$PROJECT_DIR$/artifacts/api-server/src/routes/bookings.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/artifacts/api-server/src/routes/payments.ts" beforeDir="false" afterPath="$PROJECT_DIR$/artifacts/api-server/src/routes/payments.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/artifacts/api-server/src/routes/tracking.ts" beforeDir="false" afterPath="$PROJECT_DIR$/artifacts/api-server/src/routes/tracking.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/artifacts/mockup-sandbox/vite.config.ts" beforeDir="false" afterPath="$PROJECT_DIR$/artifacts/mockup-sandbox/vite.config.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/artifacts/rentbuild-india/src/App.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/artifacts/rentbuild-india/src/App.tsx" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -42,7 +50,7 @@
   <component name="Git.Settings">
     <option name="RECENT_BRANCH_BY_REPOSITORY">
       <map>
-        <entry key="$PROJECT_DIR$" value="main" />
+        <entry key="$PROJECT_DIR$" value="DEV" />
       </map>
     </option>
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
@@ -61,23 +69,23 @@
 }</component>
   <component name="NextEditCompletionFeaturesState">
     <decayedCancelled>
-      <entry key="MS100" value="1.243163880951388" />
-      <entry key="MS500" value="1.8934898697680875" />
-      <entry key="S2" value="4.656990662560833" />
-      <entry key="S5" value="7.141204038980075" />
-      <entry key="S10" value="8.410287475175789" />
-      <entry key="S30" value="9.733731722580085" />
-      <entry key="S60" value="11.566269103219875" />
-      <entry key="M2" value="15.255665021445768" />
-      <entry key="M5" value="27.34173656606262" />
-      <entry key="M10" value="46.86535294615116" />
-      <entry key="M15" value="63.388000792956944" />
-      <entry key="M30" value="95.3044978755871" />
-      <entry key="H1" value="123.25496759122456" />
-      <entry key="H2" value="144.46652367178712" />
-      <entry key="H4" value="159.89030497429303" />
-      <entry key="D1" value="178.3223028058707" />
-      <entry key="W1" value="182.30583447347772" />
+      <entry key="MS100" value="1.000132658064273" />
+      <entry key="MS500" value="1.1677052781102826" />
+      <entry key="S2" value="1.639938681795509" />
+      <entry key="S5" value="1.8503658355301285" />
+      <entry key="S10" value="2.2921540456270364" />
+      <entry key="S30" value="7.73389751985505" />
+      <entry key="S60" value="15.115179592532352" />
+      <entry key="M2" value="23.896495215522286" />
+      <entry key="M5" value="40.07987153963037" />
+      <entry key="M10" value="61.277385588303645" />
+      <entry key="M15" value="78.57757781468673" />
+      <entry key="M30" value="111.85292368421476" />
+      <entry key="H1" value="141.07026673961198" />
+      <entry key="H2" value="163.2001890658288" />
+      <entry key="H4" value="179.19407213437225" />
+      <entry key="D1" value="198.19374011513688" />
+      <entry key="W1" value="202.28708230836955" />
     </decayedCancelled>
     <decayedSelected>
       <entry key="MS100" value="0.0" />
@@ -99,23 +107,23 @@
       <entry key="W1" value="0.0" />
     </decayedSelected>
     <decayedShown>
-      <entry key="MS100" value="1.123653596527207" />
-      <entry key="MS500" value="1.8541658048014962" />
-      <entry key="S2" value="4.633385133674857" />
-      <entry key="S5" value="7.126760268463545" />
-      <entry key="S10" value="8.401781249880361" />
-      <entry key="S30" value="9.730485247679058" />
-      <entry key="S60" value="11.564368935357423" />
-      <entry key="M2" value="15.25306864671492" />
-      <entry key="M5" value="27.33457870700293" />
-      <entry key="M10" value="46.85749296607578" />
-      <entry key="M15" value="63.38106775533233" />
-      <entry key="M30" value="95.29983058246236" />
-      <entry key="H1" value="123.25222835323251" />
-      <entry key="H2" value="144.46502602424852" />
-      <entry key="H4" value="159.88951524874918" />
-      <entry key="D1" value="178.32216368511675" />
-      <entry key="W1" value="182.3058143756386" />
+      <entry key="MS100" value="0.9139543696080695" />
+      <entry key="MS500" value="1.1473068959706745" />
+      <entry key="S2" value="1.6330083543805383" />
+      <entry key="S5" value="1.8472611568152417" />
+      <entry key="S10" value="2.2901197159021436" />
+      <entry key="S30" value="7.730664470917308" />
+      <entry key="S60" value="15.111742347931447" />
+      <entry key="M2" value="23.892922469929385" />
+      <entry key="M5" value="40.07297461294901" />
+      <entry key="M10" value="61.269710027248834" />
+      <entry key="M15" value="78.57070812992667" />
+      <entry key="M30" value="111.84821495806229" />
+      <entry key="H1" value="141.0674753917331" />
+      <entry key="H2" value="163.1986551998253" />
+      <entry key="H4" value="179.19326139422304" />
+      <entry key="D1" value="198.19359704634695" />
+      <entry key="W1" value="202.28706163487496" />
     </decayedShown>
   </component>
   <component name="PackageJsonUpdateNotifier">
@@ -152,6 +160,7 @@
   <component name="Projectid" id="3JRXMSROI8PnmrKvnOfCCoHxFHJ" />
   <component name="PropertiesComponent"><![CDATA[{
   "keyToString": {
+    "Maven. [clean].executor": "Run",
     "PowerShell.bootstrap.ps1.executor": "Run",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
@@ -163,7 +172,7 @@
     "codeWithMe.voiceChat.enabledByDefault": "false",
     "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
     "copilot.chat.legacySessionMetadata.migrated": "true",
-    "git-widget-placeholder": "DEV",
+    "git-widget-placeholder": "main",
     "ignore.virus.scanning.warn.message": "true",
     "javascript.preferred.runtime.type.id": "node",
     "junie.onboarding.icon.badge.shown": "true",
@@ -174,11 +183,19 @@
     "node.js.selected.package.tslint": "(autodetect)",
     "nodejs_interpreter_path": "node",
     "nodejs_package_manager_path": "pnpm",
+    "project.structure.last.edited": "Project",
+    "project.structure.proportion": "0.0",
+    "project.structure.side.proportion": "0.0",
     "settings.editor.selected.configurable": "preferences.pluginManager",
     "to.speed.mode.migration.done": "true",
     "ts.external.directory.path": "C:\\Program Files\\JetBrains\\IntelliJ IDEA 2026.2.3\\plugins\\javascript-plugin\\jsLanguageServicesImpl\\external"
   }
 }]]></component>
+  <component name="RunAnythingCache">
+    <option name="myCommands">
+      <command value="mvn clean " />
+    </option>
+  </component>
   <component name="RunManager" selected="Shell Script.rent &amp; build">
     <configuration default="true" type="Kotlin StandaloneScriptRunConfigurationType">
       <module name="RENT BUILD" />
@@ -227,6 +244,10 @@
     </configuration>
     <recent_temporary>
       <list>
+        <item itemvalue="PowerShell.bootstrap.ps1" />
+        <item itemvalue="PowerShell.bootstrap.ps1" />
+        <item itemvalue="PowerShell.bootstrap.ps1" />
+        <item itemvalue="PowerShell.bootstrap.ps1" />
         <item itemvalue="PowerShell.bootstrap.ps1" />
       </list>
     </recent_temporary>

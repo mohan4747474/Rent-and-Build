@@ -27,20 +27,22 @@ router.post("/register", async (req, res, next) => {
       role: input.role,
     }).returning({ id: users.id, role: users.role });
     return res.status(201).json({ accessToken: signAccessToken(user), user });
-  } catch (error) { next(error); }
+  } catch (error) { return next(error); }
 });
 
-router.post("/admin/login", async (req, res) => {
-  const input = z.object({ userId: z.string().min(3).max(120), password: z.string().min(8) }).parse(req.body);
-  const adminUserId = process.env.ADMIN_USER_ID ?? process.env.ADMIN_EMAIL;
-  const adminPassword = process.env.ADMIN_PASSWORD;
-  if (!adminUserId || !adminPassword || input.userId.trim().toLowerCase() !== adminUserId.trim().toLowerCase() || input.password !== adminPassword) {
-    return res.status(401).json({ error: "Invalid administrator credentials" });
-  }
-  return res.json({
-    accessToken: signAccessToken({ id: "configured-admin", role: "admin" }),
-    user: { userId: adminUserId, role: "admin" },
-  });
+router.post("/admin/login", async (req, res, next) => {
+  try {
+    const input = z.object({ userId: z.string().min(3).max(120), password: z.string().min(8) }).parse(req.body);
+    const adminUserId = process.env.ADMIN_USER_ID ?? process.env.ADMIN_EMAIL;
+    const adminPassword = process.env.ADMIN_PASSWORD;
+    if (!adminUserId || !adminPassword || input.userId.trim().toLowerCase() !== adminUserId.trim().toLowerCase() || input.password !== adminPassword) {
+      return res.status(401).json({ error: "Invalid administrator credentials" });
+    }
+    return res.json({
+      accessToken: signAccessToken({ id: "configured-admin", role: "admin" }),
+      user: { userId: adminUserId, role: "admin" },
+    });
+  } catch (error) { return next(error); }
 });
 
 router.post("/login", async (req, res, next) => {
@@ -54,7 +56,7 @@ router.post("/login", async (req, res, next) => {
       accessToken: signAccessToken({ id: user.id, role: user.role }),
       user: { id: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role },
     });
-  } catch (error) { next(error); }
+  } catch (error) { return next(error); }
 });
 
 export default router;

@@ -27,7 +27,7 @@ router.post("/create-order", requireAuth, async (req: AuthRequest, res, next) =>
       amountPaise: input.amountPaise,
     });
     return res.status(201).json({ order, keyId: process.env.RAZORPAY_KEY_ID });
-  } catch (error) { next(error); }
+  } catch (error) { return next(error); }
 });
 
 router.post("/verify", requireAuth, async (req: AuthRequest, res, next) => {
@@ -51,7 +51,7 @@ router.post("/verify", requireAuth, async (req: AuthRequest, res, next) => {
     await deliverNotification(customer, "Payment successful", message);
     return res.json({ verified: true, status: "captured" });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 

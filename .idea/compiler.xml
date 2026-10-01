@@ -1,13 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-    <component name="CompilerConfiguration">
-        <annotationProcessing>
-            <profile name="Maven default annotation processors profile" enabled="true">
-                <sourceOutputDir name="target/generated-sources/annotations" />
-                <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
-                <outputRelativeToContentRoot value="true" />
-                <module name="rentbuild-launcher" />
-            </profile>
-        </annotationProcessing>
-    </component>
+  <component name="CompilerConfiguration">
+    <annotationProcessing>
+      <profile name="Maven default annotation processors profile" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <module name="rentbuild-launcher" />
+      </profile>
+    </annotationProcessing>
+    <bytecodeTargetLevel>
+      <module name="build-orchestrator" target="11" />
+      <module name="rent-and-build-parent" target="11" />
+    </bytecodeTargetLevel>
+  </component>
 </project>
