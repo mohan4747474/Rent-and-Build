@@ -15,7 +15,7 @@ export function requireAuth(req: AuthRequest, res: Response, next: NextFunction)
   if (!token) return res.status(401).json({ error: "Authentication required" });
   try {
     req.user = jwt.verify(token, secret(), { issuer: "rentbuild-india" }) as AuthUser;
-    next();
+    return next();
   } catch {
     return res.status(401).json({ error: "Invalid or expired access token" });
   }
@@ -26,5 +26,5 @@ export const requireRoles = (...roles: AuthUser["role"][]) =>
     if (!req.user || !roles.includes(req.user.role)) {
       return res.status(403).json({ error: "Insufficient permissions" });
     }
-    next();
+    return next();
   };

@@ -60,7 +60,7 @@ router.post("/:bookingId/cancel", requireAuth, async (req: AuthRequest, res, nex
     await deliverNotification(customer, "Booking cancelled and refund initiated", message);
     return res.json({ booking: cancelled, cancellationFeePaise, refundAmountPaise });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
