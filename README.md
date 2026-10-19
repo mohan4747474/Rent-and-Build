@@ -25,4 +25,7 @@ mvn clean verify
 ```
 
 The tests exercise full job execution against an isolated in-memory database. The HTML coverage report is generated at `target/site/jacoco/index.html`.
-fwefgfhuefgecve
+
+rent and build
+
+
