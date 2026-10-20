@@ -10,6 +10,7 @@ import org.springframework.batch.core.Step;
 import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.builder.StepBuilder;
+import org.springframework.batch.item.ItemProcessor;
 import org.springframework.batch.item.ItemReader;
 import org.springframework.batch.item.database.JdbcBatchItemWriter;
 import org.springframework.batch.item.database.builder.JdbcBatchItemWriterBuilder;
@@ -26,6 +27,8 @@ import org.springframework.transaction.PlatformTransactionManager;
 
 @Configuration
 public class EquipmentImportConfiguration {
+    private static final String VEHICLE_NUMBER_PATTERN = "^[A-Za-z][A-Za-z0-9 -]*$";
+    private static final String INTERNATIONAL_PHONE_PATTERN = "^\\+[1-9][0-9]{7,14}$";
     private static final String[] CSV_COLUMNS = {
             "owner_id", "name", "category", "vehicle_number", "license_number",
             "rc_card_number", "city", "description", "hourly_rate", "daily_rate",
@@ -121,14 +124,36 @@ public class EquipmentImportConfiguration {
     }
 
     @Bean
+    public ItemProcessor<EquipmentCsvRecord, EquipmentCsvRecord> validateEquipment() {
+        return item -> {
+            if (item.vehicleNumber() == null || !item.vehicleNumber().trim().matches(VEHICLE_NUMBER_PATTERN)) {
+                throw new IllegalArgumentException("Vehicle number must start with a letter: " + item.vehicleNumber());
+            }
+            if (!isInternationalPhone(item.ownerPhone())) {
+                throw new IllegalArgumentException("Owner phone must include + and a country code: " + item.ownerPhone());
+            }
+            if (!isInternationalPhone(item.operatorPhone())) {
+                throw new IllegalArgumentException("Operator phone must include + and a country code: " + item.operatorPhone());
+            }
+            return item;
+        };
+    }
+
+    private static boolean isInternationalPhone(String phone) {
+        return phone != null && phone.matches(INTERNATIONAL_PHONE_PATTERN);
+    }
+
+    @Bean
     public Step importEquipmentStep(
             JobRepository jobRepository,
             PlatformTransactionManager transactionManager,
             ItemReader<EquipmentCsvRecord> equipmentReader,
+            ItemProcessor<EquipmentCsvRecord, EquipmentCsvRecord> validateEquipment,
             JdbcBatchItemWriter<EquipmentCsvRecord> equipmentWriter) {
         return new StepBuilder("importEquipmentStep", jobRepository)
                 .<EquipmentCsvRecord, EquipmentCsvRecord>chunk(100, transactionManager)
                 .reader(equipmentReader)
+                .processor(validateEquipment)
                 .writer(equipmentWriter)
                 .build();
     }

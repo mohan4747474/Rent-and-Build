@@ -21,6 +21,7 @@ import {
   ClipboardList,
   Clock3,
   CreditCard,
+  Download,
   Gauge,
   Heart,
   LayoutDashboard,
@@ -107,6 +108,7 @@ type WorkspaceUser = {
   fullName: string;
   primaryEmailAddress: { emailAddress: string };
   role: 'customer' | 'owner' | 'operator' | 'admin';
+  phone?: string;
 };
 
 type LocalAccount = WorkspaceUser & { password: string };
@@ -245,6 +247,12 @@ type SensorData = {
   lastSync: string;
 };
 
+type SensorHistoryRecord = {
+  equipmentId: string;
+  recordedAt: string;
+  sensor: SensorData;
+};
+
 const equipmentSeed: Equipment[] = [];
 const defaultNotifications: AppNotification[] = [];
 const defaultSensors: Record<string, SensorData> = {};
@@ -270,6 +278,148 @@ const defaultSensor: SensorData = {
 };
 
 const fmt = (value: number) => new Intl.NumberFormat('en-IN').format(value);
+const strongPasswordPattern = '(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[^A-Za-z0-9]).{8,}';
+const internationalPhonePattern = '\\+[1-9][0-9]{7,14}';
+const vehicleNumberPattern = '[A-Za-z][A-Za-z0-9 -]*';
+const hasStrongPassword = (password: string) =>
+  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/.test(password);
+const isInternationalPhone = (phone: string) => /^\+[1-9][0-9]{7,14}$/.test(phone);
+const isValidVehicleNumber = (vehicleNumber: string) => /^[A-Za-z][A-Za-z0-9 -]*$/.test(vehicleNumber.trim());
+
+const vehicleExportFields: { label: string; getValue: (item: Equipment) => string | number | boolean }[] = [
+  { label: 'Vehicle ID', getValue: (item) => item.id },
+  { label: 'Equipment name', getValue: (item) => item.name },
+  { label: 'Machine type', getValue: (item) => item.type },
+  { label: 'Vehicle number', getValue: (item) => item.vehicleNumber },
+  { label: 'RC card number', getValue: (item) => item.rcCardNumber },
+  { label: 'Location city', getValue: (item) => item.city },
+  { label: 'Rating', getValue: (item) => item.rating },
+  { label: 'Reviews', getValue: (item) => item.reviews },
+  { label: 'Daily rate', getValue: (item) => item.price },
+  { label: 'Image category', getValue: (item) => item.image },
+  { label: 'Listing tag', getValue: (item) => item.tag },
+  { label: 'Availability', getValue: (item) => item.available },
+  { label: 'Owner name', getValue: (item) => item.owner },
+  { label: 'Owner email', getValue: (item) => item.ownerEmail ?? '' },
+  { label: 'Owner phone', getValue: (item) => item.ownerPhone },
+  { label: 'Operator name', getValue: (item) => item.operatorName },
+  { label: 'Operator phone', getValue: (item) => item.operatorPhone },
+  { label: 'Operator experience', getValue: (item) => item.operatorExperience },
+  { label: 'Working hours', getValue: (item) => item.workingHours },
+  { label: 'Kilometers driven', getValue: (item) => item.kmDriven },
+  { label: 'Sensors working', getValue: (item) => item.sensorsWorking },
+  { label: 'Operator included', getValue: (item) => item.operatorIncluded },
+];
+
+const sensorExportFields: { label: string; key: keyof SensorData }[] = [
+  { label: 'GPS latitude', key: 'latitude' },
+  { label: 'GPS longitude', key: 'longitude' },
+  { label: 'Temperature (°C)', key: 'temperature' },
+  { label: 'Mileage', key: 'mileage' },
+  { label: 'Working hours', key: 'workHours' },
+  { label: 'Kilometers driven', key: 'kmDriven' },
+  { label: 'Fuel level (%)', key: 'fuel' },
+  { label: 'Odometer (km)', key: 'odometerKm' },
+  { label: 'Speed (km/h)', key: 'speedKph' },
+  { label: 'Engine speed (RPM)', key: 'engineRpm' },
+  { label: 'Engine load (%)', key: 'engineLoad' },
+  { label: 'Battery voltage (V)', key: 'batteryVoltage' },
+  { label: 'Oil pressure (bar)', key: 'oilPressure' },
+  { label: 'Hydraulic pressure (bar)', key: 'hydraulicPressure' },
+  { label: 'Coolant level (%)', key: 'coolantLevel' },
+  { label: 'Fuel consumption rate (L/h)', key: 'fuelRate' },
+  { label: 'Engine status', key: 'engineStatus' },
+  { label: 'Last sensor update', key: 'lastSync' },
+];
+
+const bookingExportFields: {
+  label: string;
+  getValue: (booking: Booking) => string | number;
+}[] = [
+  { label: 'Booking ID', getValue: (booking) => booking.id },
+  { label: 'Booking location', getValue: (booking) => booking.location },
+  { label: 'Booking start date', getValue: (booking) => booking.startDate },
+  { label: 'Booking end date', getValue: (booking) => booking.endDate },
+  { label: 'Booking total', getValue: (booking) => booking.total },
+  { label: 'Payment method', getValue: (booking) => booking.paymentMethod },
+  { label: 'Payment status', getValue: (booking) => booking.paymentStatus },
+  { label: 'Booking status', getValue: (booking) => booking.status },
+  { label: 'Cancellation fee', getValue: (booking) => booking.cancellationFee ?? '' },
+  { label: 'Refund amount', getValue: (booking) => booking.refundAmount ?? '' },
+  { label: 'Booking created at', getValue: (booking) => booking.createdAt },
+];
+
+function downloadVehicleCsv(
+  equipment: Equipment[],
+  sensors: Record<string, SensorData>,
+  sensorHistory: SensorHistoryRecord[],
+  bookings: Booking[],
+) {
+  const header = [
+    'Record type',
+    ...vehicleExportFields.map(({ label }) => label),
+    'Recorded at',
+    ...sensorExportFields.map(({ label }) => label),
+    ...bookingExportFields.map(({ label }) => label),
+  ];
+  const rows: (string | number | boolean)[][] = [];
+  const emptySensor = sensorExportFields.map(() => '');
+  const emptyBooking = bookingExportFields.map(() => '');
+
+  for (const item of equipment) {
+    const vehicleDetails = vehicleExportFields.map(({ getValue }) =>
+      getValue(item),
+    );
+    const liveSensor = { ...defaultSensor, ...sensors[item.id] };
+    rows.push([
+      'Live sensor reading',
+      ...vehicleDetails,
+      liveSensor.lastSync,
+      ...sensorExportFields.map(({ key }) => liveSensor[key]),
+      ...emptyBooking,
+    ]);
+
+    for (const record of sensorHistory
+      .filter(({ equipmentId }) => equipmentId === item.id)
+      .sort((a, b) => a.recordedAt.localeCompare(b.recordedAt))) {
+      rows.push([
+        'Past sensor reading',
+        ...vehicleDetails,
+        record.recordedAt,
+        ...sensorExportFields.map(({ key }) => record.sensor[key]),
+        ...emptyBooking,
+      ]);
+    }
+
+    for (const booking of bookings.filter(
+      ({ equipmentId }) => equipmentId === item.id,
+    )) {
+      rows.push([
+        'Booking',
+        ...vehicleDetails,
+        '',
+        ...emptySensor,
+        ...bookingExportFields.map(({ getValue }) => getValue(booking)),
+      ]);
+    }
+  }
+  const csv = [header, ...rows]
+    .map((row) =>
+      row
+        .map((value) => `"${String(value).replace(/"/g, '""')}"`)
+        .join(','),
+    )
+    .join('\r\n');
+  const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `rentbuild-vehicle-export-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+}
 
 function useStoredState<T>(key: string, initial: T) {
   const [value, setValue] = useState<T>(() => {
@@ -303,6 +453,7 @@ type AppState = {
   markNotificationsRead: () => void;
   sensors: Record<string, SensorData>;
   setSensors: Dispatch<SetStateAction<Record<string, SensorData>>>;
+  sensorHistory: SensorHistoryRecord[];
 };
 
 const AppStateContext = createContext<AppState | null>(null);
@@ -331,6 +482,24 @@ function AppStateProvider({ children }: { children: ReactNode }) {
     'rb-sensors',
     defaultSensors,
   );
+  const [sensorHistory, setSensorHistory] = useStoredState<SensorHistoryRecord[]>(
+    'rb-sensor-history',
+    [],
+  );
+  useEffect(() => {
+    setSensorHistory((current) => {
+      const latestByEquipment = new Map<string, SensorData>();
+      current.forEach((record) => latestByEquipment.set(record.equipmentId, record.sensor));
+      const newRecords = Object.entries(sensors)
+        .filter(([equipmentId, sensor]) => JSON.stringify(latestByEquipment.get(equipmentId)) !== JSON.stringify(sensor))
+        .map(([equipmentId, sensor]) => ({
+          equipmentId,
+          recordedAt: new Date().toISOString(),
+          sensor,
+        }));
+      return newRecords.length ? [...current, ...newRecords] : current;
+    });
+  }, [sensors, setSensorHistory]);
   useEffect(() => {
     setEquipment((current) => current.filter((item) => !['cat-320', 'volvo-a40', 'liebherr', 'jcb-3dx', 'cummins-125'].includes(item.id)));
     setNotifications((current) => current.filter((item) => !['n1', 'n2', 'n3'].includes(item.id)));
@@ -368,6 +537,7 @@ function AppStateProvider({ children }: { children: ReactNode }) {
           setNotifications((current) => current.map((item) => ({ ...item, read: true }))),
         sensors,
         setSensors,
+        sensorHistory,
       }}
     >
       {children}
@@ -584,10 +754,19 @@ function AuthPage({ mode }: { mode: 'sign-in' | 'sign-up' }) {
       if (!auth) return;
       let authenticatedUser: WorkspaceUser;
       if (mode === 'sign-up') {
+        if (!hasStrongPassword(form.password)) {
+          setError('Password must be at least 8 characters and include lowercase, uppercase, a number, and a special character.');
+          return;
+        }
+        if (!isInternationalPhone(form.phone)) {
+          setError('Enter a valid phone number in international format, starting with + and the country code (for example, +919876543210).');
+          return;
+        }
         authenticatedUser = {
           fullName: form.name || 'RentBuild user',
           primaryEmailAddress: { emailAddress: form.email || 'user@rentbuild.local' },
           role: form.role,
+          phone: form.phone,
         };
         auth.register(authenticatedUser, form.password);
       } else {
@@ -612,7 +791,7 @@ function AuthPage({ mode }: { mode: 'sign-in' | 'sign-up' }) {
       window.history.pushState({}, '', `${basePath}${destination}`);
       window.dispatchEvent(new PopStateEvent('popstate'));
     };
-    return <div className="flex min-h-[100dvh] items-center justify-center bg-background px-5 py-10"><form onSubmit={submit} className="w-full max-w-md border border-border bg-card p-7"><Logo /><h1 className="display-font mt-8 text-4xl font-bold uppercase">{mode === 'sign-in' ? 'Sign in locally' : 'Create account'}</h1><p className="mt-3 text-sm leading-6 text-muted-foreground">Use the credentials for the account type you want to access. Owner login opens the owner workspace; administrator login opens the control room.</p>{mode === 'sign-up' && <input required placeholder="Full name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="mt-6 h-11 w-full border border-input bg-background px-3 text-sm" />}<input required type="email" placeholder="Email / user ID" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="mt-3 h-11 w-full border border-input bg-background px-3 text-sm" /><input required type="password" minLength={8} placeholder="Password (8+ characters)" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="mt-3 h-11 w-full border border-input bg-background px-3 text-sm" />{mode === 'sign-up' && <><input required placeholder="Phone number" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="mt-3 h-11 w-full border border-input bg-background px-3 text-sm" /><select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as WorkspaceUser['role'] })} className="mt-3 h-11 w-full border border-input bg-background px-3 text-sm"><option value="customer">Customer</option><option value="owner">Equipment owner</option><option value="operator">Operator</option></select></>}{error && <p className="mt-3 text-xs text-red-400">{error}</p>}<button className="mt-6 flex h-11 w-full items-center justify-center gap-2 bg-primary text-xs font-bold text-primary-foreground">{mode === 'sign-in' ? 'SIGN IN' : 'REGISTER AND CONTINUE'} <ArrowRight size={15} /></button><Link href={mode === 'sign-in' ? '/sign-up' : '/sign-in'} className="mt-5 block text-center text-xs font-semibold text-primary">{mode === 'sign-in' ? 'Need an account? Register' : 'Already registered? Sign in'}</Link></form></div>;
+    return <div className="flex min-h-[100dvh] items-center justify-center bg-background px-5 py-10"><form onSubmit={submit} className="w-full max-w-md border border-border bg-card p-7"><Logo /><h1 className="display-font mt-8 text-4xl font-bold uppercase">{mode === 'sign-in' ? 'Sign in locally' : 'Create account'}</h1><p className="mt-3 text-sm leading-6 text-muted-foreground">Use the credentials for the account type you want to access. Owner login opens the owner workspace; administrator login opens the control room.</p>{mode === 'sign-up' && <input required placeholder="Full name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="mt-6 h-11 w-full border border-input bg-background px-3 text-sm" />}<input required type="email" placeholder="Email / user ID" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="mt-3 h-11 w-full border border-input bg-background px-3 text-sm" /><input required type="password" minLength={8} pattern={mode === 'sign-up' ? strongPasswordPattern : undefined} title="Use at least 8 characters with lowercase, uppercase, a number, and a special character." placeholder={mode === 'sign-up' ? 'Strong password' : 'Password'} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="mt-3 h-11 w-full border border-input bg-background px-3 text-sm" />{mode === 'sign-up' && <><p className="mt-2 text-[11px] leading-5 text-muted-foreground">Use at least 8 characters with lowercase and uppercase letters, a number, and a special character.</p><input required type="tel" inputMode="tel" pattern={internationalPhonePattern} title="Enter + followed by the country code and phone number, digits only (for example, +919876543210)." placeholder="Phone number with country code (e.g. +919876543210)" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="mt-3 h-11 w-full border border-input bg-background px-3 text-sm" /><select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as WorkspaceUser['role'] })} className="mt-3 h-11 w-full border border-input bg-background px-3 text-sm"><option value="customer">Customer</option><option value="owner">Equipment owner</option><option value="operator">Operator</option></select></>}{error && <p className="mt-3 text-xs text-red-400">{error}</p>}<button className="mt-6 flex h-11 w-full items-center justify-center gap-2 bg-primary text-xs font-bold text-primary-foreground">{mode === 'sign-in' ? 'SIGN IN' : 'REGISTER AND CONTINUE'} <ArrowRight size={15} /></button><Link href={mode === 'sign-in' ? '/sign-up' : '/sign-in'} className="mt-5 block text-center text-xs font-semibold text-primary">{mode === 'sign-in' ? 'Need an account? Register' : 'Already registered? Sign in'}</Link></form></div>;
   }
   const path = `${basePath}/${mode}`;
   const AuthComponent = mode === 'sign-in' ? SignIn : SignUp;
@@ -673,9 +852,19 @@ function LoadingPage() {
 function ProfilePage() {
   const { profile, setProfile, addNotification } = useAppState();
   const { user } = useWorkspaceUser();
-  const [form, setForm] = useState(profile);
-  const save = (event: FormEvent) => { event.preventDefault(); setProfile(form); addNotification({ title: 'Profile details updated', body: 'Your customer details are ready for the next booking.', kind: 'system', read: false }); };
-  return <PageFrame><div className="px-5 py-12 lg:px-9 lg:py-20"><SectionLabel eyebrow="Account / 01" title="Your customer details." body="These details are required before payment so the owner knows who is responsible for the job site." /><div className="grid max-w-4xl gap-8 lg:grid-cols-[.7fr_1fr]"><div className="border border-border bg-card p-6"><div className="grid h-14 w-14 place-items-center bg-primary text-primary-foreground"><UserRound size={26} /></div><h3 className="mt-5 text-xl font-bold">{user?.fullName || form.name || 'Customer account'}</h3><p className="mt-2 text-sm leading-6 text-muted-foreground">{user?.primaryEmailAddress?.emailAddress || form.email || 'Add your contact details to unlock bookings.'}</p><div className="mt-7 space-y-3 text-xs text-muted-foreground"><div className="flex items-center gap-2"><Check size={14} className="text-emerald-400" />Clerk sign-in connected</div><div className="flex items-center gap-2"><Check size={14} className={form.phone ? 'text-emerald-400' : 'text-muted-foreground'} />Phone number {form.phone ? 'saved' : 'still required'}</div></div></div><form onSubmit={save} className="border border-border bg-card p-6"><div className="grid gap-4"><label><span className="mono-font mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">Full name *</span><input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="h-11 w-full border border-input bg-background px-3 text-sm" placeholder="Your name" /></label><label><span className="mono-font mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">Phone number *</span><input required type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="h-11 w-full border border-input bg-background px-3 text-sm" placeholder="+91 98765 43210" /></label><label><span className="mono-font mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">Email ID *</span><input required type="email" value={form.email || user?.primaryEmailAddress?.emailAddress || ''} onChange={(e) => setForm({ ...form, email: e.target.value })} className="h-11 w-full border border-input bg-background px-3 text-sm" placeholder="you@company.com" /></label></div><button className="mt-6 flex h-11 w-full items-center justify-center gap-2 bg-primary text-xs font-bold text-primary-foreground"><Check size={15} /> SAVE CUSTOMER DETAILS</button></form></div></div></PageFrame>;
+  const [form, setForm] = useState({ ...profile, phone: profile.phone || user?.phone || '' });
+  const [phoneError, setPhoneError] = useState('');
+  const save = (event: FormEvent) => {
+    event.preventDefault();
+    if (!isInternationalPhone(form.phone)) {
+      setPhoneError('Enter a valid phone number in international format, starting with + and the country code.');
+      return;
+    }
+    setPhoneError('');
+    setProfile(form);
+    addNotification({ title: 'Profile details updated', body: 'Your customer details are ready for the next booking.', kind: 'system', read: false });
+  };
+  return <PageFrame><div className="px-5 py-12 lg:px-9 lg:py-20"><SectionLabel eyebrow="Account / 01" title="Your customer details." body="These details are required before payment so the owner knows who is responsible for the job site." /><div className="grid max-w-4xl gap-8 lg:grid-cols-[.7fr_1fr]"><div className="border border-border bg-card p-6"><div className="grid h-14 w-14 place-items-center bg-primary text-primary-foreground"><UserRound size={26} /></div><h3 className="mt-5 text-xl font-bold">{user?.fullName || form.name || 'Customer account'}</h3><p className="mt-2 text-sm leading-6 text-muted-foreground">{user?.primaryEmailAddress?.emailAddress || form.email || 'Add your contact details to unlock bookings.'}</p><div className="mt-7 space-y-3 text-xs text-muted-foreground"><div className="flex items-center gap-2"><Check size={14} className="text-emerald-400" />Clerk sign-in connected</div><div className="flex items-center gap-2"><Check size={14} className={form.phone ? 'text-emerald-400' : 'text-muted-foreground'} />Phone number {form.phone ? 'saved' : 'still required'}</div></div></div><form onSubmit={save} className="border border-border bg-card p-6"><div className="grid gap-4"><label><span className="mono-font mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">Full name *</span><input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="h-11 w-full border border-input bg-background px-3 text-sm" placeholder="Your name" /></label><label><span className="mono-font mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">Phone number *</span><input required type="tel" inputMode="tel" pattern={internationalPhonePattern} title="Enter + followed by the country code and phone number, digits only (for example, +919876543210)." value={form.phone} onChange={(e) => { setPhoneError(''); setForm({ ...form, phone: e.target.value }); }} className="h-11 w-full border border-input bg-background px-3 text-sm" placeholder="+919876543210" /><span className="mt-1 block text-[10px] text-muted-foreground">Use international format: +, country code, then digits (no spaces).</span></label><label><span className="mono-font mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">Email ID *</span><input required type="email" value={form.email || user?.primaryEmailAddress?.emailAddress || ''} onChange={(e) => setForm({ ...form, email: e.target.value })} className="h-11 w-full border border-input bg-background px-3 text-sm" placeholder="you@company.com" /></label></div>{phoneError && <p role="alert" className="mt-4 text-xs text-red-400">{phoneError}</p>}<button className="mt-6 flex h-11 w-full items-center justify-center gap-2 bg-primary text-xs font-bold text-primary-foreground"><Check size={15} /> SAVE CUSTOMER DETAILS</button></form></div></div></PageFrame>;
 }
 
 function BookingPage() {
@@ -685,7 +874,7 @@ function BookingPage() {
   const [, setLocation] = useLocation();
   const item = equipment.find((machine) => machine.id === id) ?? equipment[0];
   const [step, setStep] = useState(1);
-  const [details, setDetails] = useState<UserProfile>({ name: profile.name || user?.fullName || '', phone: profile.phone, email: profile.email || user?.primaryEmailAddress?.emailAddress || '' });
+  const [details, setDetails] = useState<UserProfile>({ name: profile.name || user?.fullName || '', phone: profile.phone || user?.phone || '', email: profile.email || user?.primaryEmailAddress?.emailAddress || '' });
   const [paymentMethod, setPaymentMethod] = useState('UPI / VPA');
   const [paymentStatus, setPaymentStatus] = useState<'idle' | 'authorizing' | 'paid'>('idle');
   const [bookingId, setBookingId] = useState('');
@@ -702,6 +891,10 @@ function BookingPage() {
   const total = rentalSubtotal + platformFee + gst;
   const saveDetails = (event: FormEvent) => {
     event.preventDefault();
+    if (!isInternationalPhone(details.phone)) {
+      setScheduleError('Enter a valid phone number in international format, starting with + and the country code.');
+      return;
+    }
     if (!startDate || !endDate || endAt <= startAt) {
       setScheduleError('Select a valid end date and time after the start date and time.');
       return;
@@ -714,7 +907,7 @@ function BookingPage() {
   const authorizePayment = () => { setPaymentStatus('authorizing'); window.setTimeout(() => { setPaymentStatus('paid'); addNotification({ title: 'Payment authorized', body: `Payment preference ${paymentMethod} is ready for ${item.name}.`, kind: 'payment', read: false }); setStep(3); }, 900); };
   const confirmBooking = () => { const newId = `RB-${String(Date.now()).slice(-6)}`; setBookingId(newId); addBooking({ id: newId, equipmentId: item.id, equipmentName: item.name, location, startDate, endDate, total, paymentMethod, paymentStatus: 'paid', status: 'confirmed', createdAt: new Date().toISOString() }); addNotification({ title: 'Booking confirmed', body: `${item.name} is reserved for ${location}.`, kind: 'booking', read: false }); setStep(4); };
   const paymentMethods = ['UPI / VPA', 'UPI QR', 'UPI Intent', 'Card', 'Net banking', 'Wallets (GPay / PhonePe / Paytm)'];
-  return <PageFrame><div className="px-5 py-12 lg:px-9 lg:py-20"><Link href="/browse" className="mb-7 inline-flex items-center gap-2 text-xs font-semibold text-muted-foreground"><ArrowLeft size={14} /> Back to equipment</Link><div className="grid gap-8 lg:grid-cols-[1fr_.75fr]"><div><div className="mono-font text-[10px] uppercase tracking-[.18em] text-primary">Protected booking / {String(step).padStart(2, '0')} of 04</div><h1 className="display-font mt-3 text-5xl font-bold uppercase leading-[.9]">{step === 1 ? 'Schedule your machine.' : step === 2 ? 'Choose payment.' : step === 3 ? 'Review before booking.' : 'Your machine is reserved.'}</h1><div className="mt-8 grid grid-cols-4 gap-2">{[['1', 'Details'], ['2', 'Payment'], ['3', 'Review'], ['4', 'Confirmed']].map(([number, label], index) => <div key={number} className={`border-t-2 pt-2 ${step > index ? 'border-primary text-foreground' : 'border-border text-muted-foreground'}`}><div className="mono-font text-[10px]">{number}</div><div className="mt-1 text-[10px] font-semibold">{label}</div></div>)}</div>{step === 1 && <form onSubmit={saveDetails} className="mt-8 max-w-xl border border-border bg-card p-6"><div className="mb-6 flex items-start gap-3 border-l-2 border-primary bg-primary/5 p-4 text-xs leading-5 text-muted-foreground"><LockKeyhole size={16} className="mt-0.5 shrink-0 text-primary" />Choose the work schedule and provide contact details before payment is authorized.</div><div className="grid gap-4 sm:grid-cols-2"><label><span className="mono-font mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">Start date and time *</span><input required type="datetime-local" value={startDate} onChange={(e) => { setStartDate(e.target.value); setScheduleError(''); }} className="h-11 w-full border border-input bg-background px-3 text-sm" /></label><label><span className="mono-font mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">End date and time *</span><input required type="datetime-local" min={startDate || undefined} value={endDate} onChange={(e) => { setEndDate(e.target.value); setScheduleError(''); }} className="h-11 w-full border border-input bg-background px-3 text-sm" /></label><label className="sm:col-span-2"><span className="mono-font mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">Full name *</span><input required value={details.name} onChange={(e) => setDetails({ ...details, name: e.target.value })} className="h-11 w-full border border-input bg-background px-3 text-sm" placeholder="Responsible person" /></label><label><span className="mono-font mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">Phone number *</span><input required type="tel" value={details.phone} onChange={(e) => setDetails({ ...details, phone: e.target.value })} className="h-11 w-full border border-input bg-background px-3 text-sm" placeholder="+91 98765 43210" /></label><label><span className="mono-font mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">Email ID *</span><input required type="email" value={details.email} onChange={(e) => setDetails({ ...details, email: e.target.value })} className="h-11 w-full border border-input bg-background px-3 text-sm" placeholder="you@company.com" /></label><label className="sm:col-span-2"><span className="mono-font mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">Delivery location *</span><input required value={location} onChange={(e) => setDeliveryLocation(e.target.value)} className="h-11 w-full border border-input bg-background px-3 text-sm" placeholder="Job site city" /></label></div>{scheduleError && <p className="mt-4 text-xs text-red-400">{scheduleError}</p>}<button className="mt-6 flex h-11 w-full items-center justify-center gap-2 bg-primary text-xs font-bold text-primary-foreground">CONTINUE TO PAYMENT <ArrowRight size={15} /></button></form>}{step === 2 && <div className="mt-8 max-w-xl border border-border bg-card p-6"><div className="flex items-center justify-between"><div><div className="mono-font text-[10px] uppercase tracking-wider text-primary">Razorpay checkout</div><h2 className="mt-2 text-xl font-bold">Select a payment method.</h2></div><CreditCard className="text-primary" /></div><div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{paymentMethods.map((method) => <button key={method} onClick={() => setPaymentMethod(method)} className={`min-h-[92px] border p-3 text-left ${paymentMethod === method ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/60'}`}><div className="grid h-7 w-7 place-items-center bg-background text-primary">{method.includes('UPI') ? <Zap size={14} /> : method === 'Card' ? <CreditCard size={14} /> : <WalletCards size={14} />}</div><div className="mt-3 text-xs font-bold">{method}</div></button>)}</div><div className="mt-6 border-t border-border pt-4 text-xs text-muted-foreground">Razorpay supports UPI QR, UPI Intent, cards, net banking, Google Pay, PhonePe, and Paytm. Live payment capture starts when Razorpay keys are configured; local mode records a safe demo authorization.</div><button onClick={authorizePayment} disabled={paymentStatus === 'authorizing'} className="mt-6 flex h-11 w-full items-center justify-center gap-2 bg-primary text-xs font-bold text-primary-foreground disabled:opacity-60">{paymentStatus === 'authorizing' ? 'AUTHORIZING PAYMENT…' : 'AUTHORIZE PAYMENT'} <ArrowRight size={15} /></button></div>}{step === 3 && <div className="mt-8 max-w-xl border border-border bg-card p-6"><div className="flex items-start gap-3 border border-emerald-400/30 bg-emerald-400/10 p-4"><Check size={18} className="text-emerald-400" /><div><div className="text-sm font-bold">Payment authorized</div><div className="mt-1 text-xs text-muted-foreground">Now confirm the booking separately so the owner can receive the work order.</div></div></div><div className="mt-6 space-y-3 text-sm"><div className="flex justify-between border-b border-border pb-3"><span className="text-muted-foreground">Customer</span><b>{details.name}</b></div><div className="flex justify-between border-b border-border pb-3"><span className="text-muted-foreground">Delivery</span><b>{location}</b></div><div className="flex justify-between border-b border-border pb-3"><span className="text-muted-foreground">Payment</span><b>{paymentMethod}</b></div><div className="flex justify-between pt-2"><span className="font-bold">Total</span><b className="text-xl text-primary">₹{fmt(total)}</b></div></div><button onClick={confirmBooking} className="mt-7 flex h-12 w-full items-center justify-center gap-2 bg-primary text-sm font-bold text-primary-foreground">CONFIRM BOOKING <Check size={16} /></button></div>}{step === 4 && <div className="mt-8 max-w-xl border border-emerald-400/30 bg-emerald-400/10 p-6"><div className="grid h-12 w-12 place-items-center rounded-full bg-emerald-400 text-[#132219]"><Check size={23} /></div><h2 className="mt-5 text-2xl font-bold">Booking confirmed.</h2><p className="mt-2 text-sm leading-6 text-muted-foreground">The owner has been notified and the equipment is reserved for your site. Your payment authorization and booking confirmation are both recorded.</p><div className="mt-6 grid gap-3 sm:grid-cols-2"><div className="border border-border bg-background/40 p-4"><div className="text-xs text-muted-foreground">Booking ID</div><div className="mt-1 font-bold">{bookingId}</div></div><div className="border border-border bg-background/40 p-4"><div className="text-xs text-muted-foreground">Next state</div><div className="mt-1 font-bold text-primary">Owner confirmation</div></div></div><div className="mt-6 flex flex-wrap gap-3"><Link href="/bookings" className="flex h-11 items-center gap-2 bg-primary px-4 text-xs font-bold text-primary-foreground">VIEW MY BOOKINGS <ArrowRight size={14} /></Link><Link href="/notifications" className="flex h-11 items-center gap-2 border border-border px-4 text-xs font-bold hover:border-primary"><Bell size={14} /> VIEW NOTIFICATIONS</Link></div></div>}</div><aside className="h-fit border border-border bg-card p-5 lg:sticky lg:top-24"><div className="mono-font text-[10px] uppercase tracking-wider text-primary">Selected equipment</div><div className="mt-4"><EquipmentIllustration kind={item.image} initials={item.type.slice(0, 3).toUpperCase()} /><h2 className="mt-4 text-lg font-bold">{item.name}</h2><div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground"><MapPin size={13} />{item.city} · {item.owner}</div></div>  <div className="mt-5 space-y-3 border-t border-border pt-4 text-xs"><div className="flex justify-between"><span className="text-muted-foreground">Rental × {rentalDays || 0} days</span><span>₹{fmt(rentalSubtotal)}</span></div><div className="flex justify-between"><span className="text-muted-foreground">Delivery &amp; platform</span><span>₹{fmt(platformFee)}</span></div><div className="flex justify-between"><span className="text-muted-foreground">GST</span><span>₹{fmt(gst)}</span></div><div className="flex justify-between border-t border-border pt-3 text-sm font-bold"><span>Estimated total</span><span className="text-primary">₹{fmt(total)}</span></div>{rentalDays > 0 && <div className="text-[10px] text-muted-foreground">{rentalDays} billable day{rentalDays === 1 ? '' : 's'} based on the selected schedule.</div>}</div><div className="mt-5 flex items-center gap-2 text-[10px] text-muted-foreground"><ShieldCheck size={14} className="text-primary" />Rate locked before confirmation</div></aside></div></div></PageFrame>;
+  return <PageFrame><div className="px-5 py-12 lg:px-9 lg:py-20"><Link href="/browse" className="mb-7 inline-flex items-center gap-2 text-xs font-semibold text-muted-foreground"><ArrowLeft size={14} /> Back to equipment</Link><div className="grid gap-8 lg:grid-cols-[1fr_.75fr]"><div><div className="mono-font text-[10px] uppercase tracking-[.18em] text-primary">Protected booking / {String(step).padStart(2, '0')} of 04</div><h1 className="display-font mt-3 text-5xl font-bold uppercase leading-[.9]">{step === 1 ? 'Schedule your machine.' : step === 2 ? 'Choose payment.' : step === 3 ? 'Review before booking.' : 'Your machine is reserved.'}</h1><div className="mt-8 grid grid-cols-4 gap-2">{[['1', 'Details'], ['2', 'Payment'], ['3', 'Review'], ['4', 'Confirmed']].map(([number, label], index) => <div key={number} className={`border-t-2 pt-2 ${step > index ? 'border-primary text-foreground' : 'border-border text-muted-foreground'}`}><div className="mono-font text-[10px]">{number}</div><div className="mt-1 text-[10px] font-semibold">{label}</div></div>)}</div>{step === 1 && <form onSubmit={saveDetails} className="mt-8 max-w-xl border border-border bg-card p-6"><div className="mb-6 flex items-start gap-3 border-l-2 border-primary bg-primary/5 p-4 text-xs leading-5 text-muted-foreground"><LockKeyhole size={16} className="mt-0.5 shrink-0 text-primary" />Choose the work schedule and provide contact details before payment is authorized.</div><div className="grid gap-4 sm:grid-cols-2"><label><span className="mono-font mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">Start date and time *</span><input required type="datetime-local" value={startDate} onChange={(e) => { setStartDate(e.target.value); setScheduleError(''); }} className="h-11 w-full border border-input bg-background px-3 text-sm" /></label><label><span className="mono-font mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">End date and time *</span><input required type="datetime-local" min={startDate || undefined} value={endDate} onChange={(e) => { setEndDate(e.target.value); setScheduleError(''); }} className="h-11 w-full border border-input bg-background px-3 text-sm" /></label><label className="sm:col-span-2"><span className="mono-font mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">Full name *</span><input required value={details.name} onChange={(e) => setDetails({ ...details, name: e.target.value })} className="h-11 w-full border border-input bg-background px-3 text-sm" placeholder="Responsible person" /></label><label><span className="mono-font mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">Phone number *</span><input required type="tel" inputMode="tel" pattern={internationalPhonePattern} title="Enter + followed by the country code and phone number, digits only (for example, +919876543210)." value={details.phone} onChange={(e) => setDetails({ ...details, phone: e.target.value })} className="h-11 w-full border border-input bg-background px-3 text-sm" placeholder="+919876543210" /></label><label><span className="mono-font mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">Email ID *</span><input required type="email" value={details.email} onChange={(e) => setDetails({ ...details, email: e.target.value })} className="h-11 w-full border border-input bg-background px-3 text-sm" placeholder="you@company.com" /></label><label className="sm:col-span-2"><span className="mono-font mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">Delivery location *</span><input required value={location} onChange={(e) => setDeliveryLocation(e.target.value)} className="h-11 w-full border border-input bg-background px-3 text-sm" placeholder="Job site city" /></label></div>{scheduleError && <p className="mt-4 text-xs text-red-400">{scheduleError}</p>}<button className="mt-6 flex h-11 w-full items-center justify-center gap-2 bg-primary text-xs font-bold text-primary-foreground">CONTINUE TO PAYMENT <ArrowRight size={15} /></button></form>}{step === 2 && <div className="mt-8 max-w-xl border border-border bg-card p-6"><div className="flex items-center justify-between"><div><div className="mono-font text-[10px] uppercase tracking-wider text-primary">Razorpay checkout</div><h2 className="mt-2 text-xl font-bold">Select a payment method.</h2></div><CreditCard className="text-primary" /></div><div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{paymentMethods.map((method) => <button key={method} onClick={() => setPaymentMethod(method)} className={`min-h-[92px] border p-3 text-left ${paymentMethod === method ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/60'}`}><div className="grid h-7 w-7 place-items-center bg-background text-primary">{method.includes('UPI') ? <Zap size={14} /> : method === 'Card' ? <CreditCard size={14} /> : <WalletCards size={14} />}</div><div className="mt-3 text-xs font-bold">{method}</div></button>)}</div><div className="mt-6 border-t border-border pt-4 text-xs text-muted-foreground">Razorpay supports UPI QR, UPI Intent, cards, net banking, Google Pay, PhonePe, and Paytm. Live payment capture starts when Razorpay keys are configured; local mode records a safe demo authorization.</div><button onClick={authorizePayment} disabled={paymentStatus === 'authorizing'} className="mt-6 flex h-11 w-full items-center justify-center gap-2 bg-primary text-xs font-bold text-primary-foreground disabled:opacity-60">{paymentStatus === 'authorizing' ? 'AUTHORIZING PAYMENT…' : 'AUTHORIZE PAYMENT'} <ArrowRight size={15} /></button></div>}{step === 3 && <div className="mt-8 max-w-xl border border-border bg-card p-6"><div className="flex items-start gap-3 border border-emerald-400/30 bg-emerald-400/10 p-4"><Check size={18} className="text-emerald-400" /><div><div className="text-sm font-bold">Payment authorized</div><div className="mt-1 text-xs text-muted-foreground">Now confirm the booking separately so the owner can receive the work order.</div></div></div><div className="mt-6 space-y-3 text-sm"><div className="flex justify-between border-b border-border pb-3"><span className="text-muted-foreground">Customer</span><b>{details.name}</b></div><div className="flex justify-between border-b border-border pb-3"><span className="text-muted-foreground">Delivery</span><b>{location}</b></div><div className="flex justify-between border-b border-border pb-3"><span className="text-muted-foreground">Payment</span><b>{paymentMethod}</b></div><div className="flex justify-between pt-2"><span className="font-bold">Total</span><b className="text-xl text-primary">₹{fmt(total)}</b></div></div><button onClick={confirmBooking} className="mt-7 flex h-12 w-full items-center justify-center gap-2 bg-primary text-sm font-bold text-primary-foreground">CONFIRM BOOKING <Check size={16} /></button></div>}{step === 4 && <div className="mt-8 max-w-xl border border-emerald-400/30 bg-emerald-400/10 p-6"><div className="grid h-12 w-12 place-items-center rounded-full bg-emerald-400 text-[#132219]"><Check size={23} /></div><h2 className="mt-5 text-2xl font-bold">Booking confirmed.</h2><p className="mt-2 text-sm leading-6 text-muted-foreground">The owner has been notified and the equipment is reserved for your site. Your payment authorization and booking confirmation are both recorded.</p><div className="mt-6 grid gap-3 sm:grid-cols-2"><div className="border border-border bg-background/40 p-4"><div className="text-xs text-muted-foreground">Booking ID</div><div className="mt-1 font-bold">{bookingId}</div></div><div className="border border-border bg-background/40 p-4"><div className="text-xs text-muted-foreground">Next state</div><div className="mt-1 font-bold text-primary">Owner confirmation</div></div></div><div className="mt-6 flex flex-wrap gap-3"><Link href="/bookings" className="flex h-11 items-center gap-2 bg-primary px-4 text-xs font-bold text-primary-foreground">VIEW MY BOOKINGS <ArrowRight size={14} /></Link><Link href="/notifications" className="flex h-11 items-center gap-2 border border-border px-4 text-xs font-bold hover:border-primary"><Bell size={14} /> VIEW NOTIFICATIONS</Link></div></div>}</div><aside className="h-fit border border-border bg-card p-5 lg:sticky lg:top-24"><div className="mono-font text-[10px] uppercase tracking-wider text-primary">Selected equipment</div><div className="mt-4"><EquipmentIllustration kind={item.image} initials={item.type.slice(0, 3).toUpperCase()} /><h2 className="mt-4 text-lg font-bold">{item.name}</h2><div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground"><MapPin size={13} />{item.city} · {item.owner}</div></div>  <div className="mt-5 space-y-3 border-t border-border pt-4 text-xs"><div className="flex justify-between"><span className="text-muted-foreground">Rental × {rentalDays || 0} days</span><span>₹{fmt(rentalSubtotal)}</span></div><div className="flex justify-between"><span className="text-muted-foreground">Delivery &amp; platform</span><span>₹{fmt(platformFee)}</span></div><div className="flex justify-between"><span className="text-muted-foreground">GST</span><span>₹{fmt(gst)}</span></div><div className="flex justify-between border-t border-border pt-3 text-sm font-bold"><span>Estimated total</span><span className="text-primary">₹{fmt(total)}</span></div>{rentalDays > 0 && <div className="text-[10px] text-muted-foreground">{rentalDays} billable day{rentalDays === 1 ? '' : 's'} based on the selected schedule.</div>}</div><div className="mt-5 flex items-center gap-2 text-[10px] text-muted-foreground"><ShieldCheck size={14} className="text-primary" />Rate locked before confirmation</div></aside></div></div></PageFrame>;
 }
 
 function BookingsPage() {
@@ -809,9 +1002,19 @@ function NewListingPage() {
     operatorName: '', operatorPhone: '', operatorExperience: '', workingHours: '', kmDriven: '',
     sensorsWorking: false, operatorIncluded: true,
   });
+  const [validationError, setValidationError] = useState('');
   const update = (field: string, value: string | boolean) => setForm((current) => ({ ...current, [field]: value }));
   const submit = (event: FormEvent) => {
     event.preventDefault();
+    if (!isValidVehicleNumber(form.vehicleNumber)) {
+      setValidationError('Vehicle number must start with a letter and contain only letters, numbers, spaces, or hyphens.');
+      return;
+    }
+    if (!isInternationalPhone(form.ownerPhone) || !isInternationalPhone(form.operatorPhone)) {
+      setValidationError('Owner and operator phone numbers must start with + and include a valid country code.');
+      return;
+    }
+    setValidationError('');
     const id = form.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || `machine-${Date.now()}`;
     addEquipment({
       id, name: form.name, type: form.type, vehicleNumber: form.vehicleNumber, rcCardNumber: form.rcCardNumber,
@@ -825,10 +1028,10 @@ function NewListingPage() {
     addNotification({ title: 'New equipment listed', body: `${form.name} is now visible in the marketplace preview.`, kind: 'system', read: false });
     setLocation('/owner/listings');
   };
-  const textField = (field: keyof typeof form, label: string, placeholder: string, type = 'text') => (
-    <label><span className="mono-font mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">{label} *</span><input required type={type} value={String(form[field])} onChange={(e) => update(field, e.target.value)} className="h-11 w-full border border-input bg-background px-3 text-sm" placeholder={placeholder} /></label>
+  const textField = (field: keyof typeof form, label: string, placeholder: string, type = 'text', pattern?: string, title?: string) => (
+    <label><span className="mono-font mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">{label} *</span><input required type={type} pattern={pattern} title={title} value={String(form[field])} onChange={(e) => update(field, e.target.value)} className="h-11 w-full border border-input bg-background px-3 text-sm" placeholder={placeholder} /></label>
   );
-  return <OwnerShell title="Add equipment"><SectionLabel eyebrow="Inventory / 03" title="Put a machine to work." body="Every vehicle listing must include the machine, meter, sensor, owner, RC, and operator details." /><form onSubmit={submit} className="max-w-3xl border border-border bg-card p-6"><div className="mono-font mb-3 text-[10px] font-bold uppercase tracking-wider text-primary">Vehicle details</div><div className="grid gap-4 sm:grid-cols-2">{textField('name', 'Equipment name', 'e.g. Tata Hitachi ZX210')}<label><span className="mono-font mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">Machine type *</span><select required value={form.type} onChange={(e) => update('type', e.target.value)} className="h-11 w-full border border-input bg-background px-3 text-sm"><option>Excavator</option><option>Dump truck</option><option>Crane</option><option>Loader</option><option>Generator</option></select></label>{textField('vehicleNumber', 'Vehicle number', 'KA 01 AB 1234')}{textField('rcCardNumber', 'RC card number', 'RC-XXXX-XXXX')}{textField('city', 'City', 'Bengaluru')}{textField('price', 'Daily rate (₹)', '4500', 'number')}{textField('workingHours', 'Working hours reading', '0', 'number')}{textField('kmDriven', 'KM driven', '0', 'number')}</div><div className="mt-7 border-t border-border pt-6"><div className="mono-font mb-3 text-[10px] font-bold uppercase tracking-wider text-primary">Owner details</div><div className="grid gap-4 sm:grid-cols-2">{textField('ownerName', 'Owner name', 'Registered owner')}{textField('ownerPhone', 'Owner phone', '+91 98765 43210', 'tel')}{textField('ownerEmail', 'Owner email', 'owner@company.com', 'email')}</div></div><div className="mt-7 border-t border-border pt-6"><div className="mono-font mb-3 text-[10px] font-bold uppercase tracking-wider text-primary">Operator details</div><div className="grid gap-4 sm:grid-cols-2">{textField('operatorName', 'Operator name', 'Full name')}{textField('operatorPhone', 'Operator number', '+91 98765 43210', 'tel')}{textField('operatorExperience', 'Operator experience', 'e.g. 8 years')}</div></div><div className="mt-6 grid gap-3 border-l-2 border-primary bg-primary/5 p-4 text-xs leading-5 text-muted-foreground"><label className="flex items-center gap-3 font-semibold text-foreground"><input required type="checkbox" checked={form.sensorsWorking} onChange={(e) => update('sensorsWorking', e.target.checked)} className="h-4 w-4 accent-[hsl(var(--primary))]" /> All vehicle sensors are working *</label><span className="flex items-center gap-3"><Radio size={16} className="shrink-0 text-primary" />ECU telemetry will use these meter readings and show live sensor status after listing.</span></div><button className="mt-6 flex h-11 w-full items-center justify-center gap-2 bg-primary text-xs font-bold text-primary-foreground"><PackagePlus size={15} /> PUBLISH LISTING</button></form></OwnerShell>;
+  return <OwnerShell title="Add equipment"><SectionLabel eyebrow="Inventory / 03" title="Put a machine to work." body="Every vehicle listing must include the machine, meter, sensor, owner, RC, and operator details." /><form onSubmit={submit} className="max-w-3xl border border-border bg-card p-6"><div className="mono-font mb-3 text-[10px] font-bold uppercase tracking-wider text-primary">Vehicle details</div><div className="grid gap-4 sm:grid-cols-2">{textField('name', 'Equipment name', 'e.g. Tata Hitachi ZX210')}<label><span className="mono-font mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">Machine type *</span><select required value={form.type} onChange={(e) => update('type', e.target.value)} className="h-11 w-full border border-input bg-background px-3 text-sm"><option>Excavator</option><option>Dump truck</option><option>Crane</option><option>Loader</option><option>Generator</option></select></label>{textField('vehicleNumber', 'Vehicle number', 'e.g. KA 01 AB 1234', 'text', vehicleNumberPattern, 'Vehicle number must begin with a letter.')}{textField('rcCardNumber', 'RC card number', 'RC-XXXX-XXXX')}{textField('city', 'City', 'Bengaluru')}{textField('price', 'Daily rate (₹)', '4500', 'number')}{textField('workingHours', 'Working hours reading', '0', 'number')}{textField('kmDriven', 'KM driven', '0', 'number')}</div><div className="mt-7 border-t border-border pt-6"><div className="mono-font mb-3 text-[10px] font-bold uppercase tracking-wider text-primary">Owner details</div><div className="grid gap-4 sm:grid-cols-2">{textField('ownerName', 'Owner name', 'Registered owner')}{textField('ownerPhone', 'Owner phone', '+919876543210', 'tel', internationalPhonePattern, 'Enter +, country code, and phone digits without spaces.')}{textField('ownerEmail', 'Owner email', 'owner@company.com', 'email')}</div></div><div className="mt-7 border-t border-border pt-6"><div className="mono-font mb-3 text-[10px] font-bold uppercase tracking-wider text-primary">Operator details</div><div className="grid gap-4 sm:grid-cols-2">{textField('operatorName', 'Operator name', 'Full name')}{textField('operatorPhone', 'Operator number', '+919876543210', 'tel', internationalPhonePattern, 'Enter +, country code, and phone digits without spaces.')}{textField('operatorExperience', 'Operator experience', 'e.g. 8 years')}</div></div><div className="mt-6 grid gap-3 border-l-2 border-primary bg-primary/5 p-4 text-xs leading-5 text-muted-foreground"><label className="flex items-center gap-3 font-semibold text-foreground"><input required type="checkbox" checked={form.sensorsWorking} onChange={(e) => update('sensorsWorking', e.target.checked)} className="h-4 w-4 accent-[hsl(var(--primary))]" /> All vehicle sensors are working *</label><span className="flex items-center gap-3"><Radio size={16} className="shrink-0 text-primary" />ECU telemetry will use these meter readings and show live sensor status after listing.</span></div>{validationError && <p role="alert" className="mt-4 text-xs text-red-400">{validationError}</p>}<button className="mt-6 flex h-11 w-full items-center justify-center gap-2 bg-primary text-xs font-bold text-primary-foreground"><PackagePlus size={15} /> PUBLISH LISTING</button></form></OwnerShell>;
 }
 
 function AdminShell({ children }: { children: ReactNode }) {
@@ -859,8 +1062,8 @@ function AdminPaymentsPage() {
 }
 
 function AdminSensorsPage() {
-  const { equipment, sensors } = useAppState();
-  return <AdminShell><SectionLabel eyebrow="Admin / sensors" title="ECU feed health." body="All machine telemetry is visible here: GPS, engine, fuel, electrical, hydraulic, fluid, odometer, and work-session readings." /><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{equipment.map((item) => { const sensor = { ...defaultSensor,
+  const { equipment, sensors, sensorHistory, bookings } = useAppState();
+  return <AdminShell><div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><SectionLabel eyebrow="Admin / sensors" title="ECU feed health." body="All machine telemetry is visible here: GPS, engine, fuel, electrical, hydraulic, fluid, odometer, and work-session readings." /><button type="button" onClick={() => downloadVehicleCsv(equipment, sensors, sensorHistory, bookings)} className="mb-7 flex h-11 shrink-0 items-center justify-center gap-2 bg-primary px-4 text-xs font-bold text-primary-foreground"><Download size={15} /> DOWNLOAD VEHICLE DETAILS CSV</button></div><p className="-mt-5 mb-6 text-xs text-muted-foreground">The CSV contains vehicle details, current and past sensor readings, and booking and payment details. Past sensor readings are available from when history tracking was enabled.</p><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{equipment.map((item) => { const sensor = { ...defaultSensor,
     ...(sensors[item.id] ?? {}),
   };
   const readings = [['GPS latitude', `${sensor.latitude.toFixed(5)}°`], ['GPS longitude', `${sensor.longitude.toFixed(5)}°`], ['Speed', `${sensor.speedKph} km/h`], ['Odometer', `${sensor.odometerKm.toLocaleString('en-IN')} km`], ['Engine temperature', `${sensor.temperature} °C`], ['Engine RPM', `${sensor.engineRpm}`], ['Engine load', `${sensor.engineLoad}%`], ['Hydraulic pressure', `${sensor.hydraulicPressure} bar`], ['Work hours', `${sensor.workHours} h`], ['Fuel level', `${sensor.fuel}%`], ['Fuel rate', `${sensor.fuelRate} L/h`], ['Battery voltage', `${sensor.batteryVoltage} V`], ['Oil pressure', `${sensor.oilPressure} bar`], ['Coolant level', `${sensor.coolantLevel}%`], ['Distance today', `${sensor.kmDriven} km`], ['Engine state', sensor.engineStatus], ['Last ECU sync', sensor.lastSync]];
@@ -959,4 +1162,3 @@ function App() {
 }
 
 export default App;
-

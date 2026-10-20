@@ -16,7 +16,7 @@ Configure the database with `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME
 java -jar target/equipment-importer-1.0.0.jar inputFile=batch-input/equipment.csv
 ```
 
-The CSV must contain the columns shown in `batch-input/equipment.csv`, in the same order. The first row is treated as the header. Spring Batch tracks completed input parameters, and the database rejects vehicle numbers that already exist.
+The CSV must contain the columns shown in `batch-input/equipment.csv`, in the same order. The first row is treated as the header. Vehicle numbers must start with a letter, and owner/operator phone numbers must use international format with a leading `+` and country code (for example, `+919876543210`). Invalid rows fail the import before they are written. Spring Batch tracks completed input parameters, and the database rejects vehicle numbers that already exist.
 
 Run the JUnit integration tests and generate the JaCoCo coverage report with:
 

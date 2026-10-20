@@ -120,7 +120,7 @@ class EquipmentImportJobTests {
                 OWNER_ID, "Excavator", "Earthmoving", "KA01AB1234",
                 "DL-EXAMPLE-001", "RC-EXAMPLE-001", "Bengaluru", description,
                 "1500.00", "10000.00", 1200, 45000, 18000,
-                "9876543210", "Sample Operator", "9876543211", "5 years",
+                "+919876543210", "Sample Operator", "+919876543211", "5 years",
                 true, "rzp-device-1", true));
     }
 
@@ -203,6 +203,38 @@ class EquipmentImportJobTests {
     }
 
     @Test
+    void rejectsVehicleNumbersThatDoNotStartWithLetters() throws Exception {
+        JobExecution execution = executeImport(csv(row(
+                "1KA01AB1234", "Invalid vehicle number", "", "true", "true")));
+
+        assertThat(execution.getStatus()).isEqualTo(BatchStatus.FAILED);
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM equipment", Integer.class))
+                .isZero();
+    }
+
+    @Test
+    void rejectsPhoneNumbersWithoutCountryCodes() throws Exception {
+        JobExecution execution = executeImport(csv(row(
+                "KA01AB1240", "Invalid owner phone", "", "true", "true")
+                .replace("+919876543210", "9876543210")));
+
+        assertThat(execution.getStatus()).isEqualTo(BatchStatus.FAILED);
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM equipment", Integer.class))
+                .isZero();
+    }
+
+    @Test
+    void rejectsInvalidOperatorPhoneNumbers() throws Exception {
+        JobExecution execution = executeImport(csv(row(
+                "KA01AB1241", "Invalid operator phone", "", "true", "true")
+                .replace("+919876543211", "9876543211")));
+
+        assertThat(execution.getStatus()).isEqualTo(BatchStatus.FAILED);
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM equipment", Integer.class))
+                .isZero();
+    }
+
+    @Test
     void failsWhenInputFileDoesNotExist() throws Exception {
         Path missingInput = tempDir.resolve("missing-equipment.csv");
         JobParameters parameters = new JobParametersBuilder()
@@ -250,7 +282,7 @@ class EquipmentImportJobTests {
                 OWNER_ID.toString(), "Excavator", "Earthmoving", vehicleNumber,
                 "DL-EXAMPLE-001", "RC-EXAMPLE-001", "Bengaluru", description,
                 "1500.00", "10000.00", "1200", "45000", "18000",
-                "9876543210", "Sample Operator", "9876543211", "5 years",
+                "+919876543210", "Sample Operator", "+919876543211", "5 years",
                 sensorsWorking, ecuDeviceId, available);
     }
 
