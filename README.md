@@ -30,4 +30,4 @@ rent and build
 
 
 rentbuild@rb.com
-admin work
+admin information 
