@@ -8,3 +8,6 @@
 
 export * from './healthStatus';
 export * from './registerRequest';
+export * from './telemetryAcceptedResponse';
+export * from './telemetryIngestRequest';
+export * from './telemetryIngestRequestEcuData';

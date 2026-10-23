@@ -63,3 +63,45 @@ export const GetTrackingCurrentEquipmentIdParams = zod.object({
 })
 
 export const GetTrackingCurrentEquipmentIdResponse = zod.unknown()
+
+
+/**
+ * Stores the reading in current and history telemetry tables, then sends its sensor details to the owner by email and SMS.
+ * @summary Store a sensor reading and notify the equipment owner
+ */
+export const postTrackingTelemetryBodyLatitudeMin = -90;
+export const postTrackingTelemetryBodyLatitudeMax = 90;
+
+export const postTrackingTelemetryBodyLongitudeMin = -180;
+export const postTrackingTelemetryBodyLongitudeMax = 180;
+
+export const postTrackingTelemetryBodySpeedKphMin = 0;
+
+export const postTrackingTelemetryBodyFuelPercentMin = 0;
+export const postTrackingTelemetryBodyFuelPercentMax = 100;
+
+export const postTrackingTelemetryBodyOdometerKmMin = 0;
+
+export const postTrackingTelemetryBodyEngineHoursMin = 0;
+
+export const postTrackingTelemetryBodyEcuDataOneMax = 60;
+
+
+
+export const PostTrackingTelemetryBody = zod.object({
+  "equipmentId": zod.string().uuid(),
+  "latitude": zod.number().min(postTrackingTelemetryBodyLatitudeMin).max(postTrackingTelemetryBodyLatitudeMax),
+  "longitude": zod.number().min(postTrackingTelemetryBodyLongitudeMin).max(postTrackingTelemetryBodyLongitudeMax),
+  "speedKph": zod.number().min(postTrackingTelemetryBodySpeedKphMin),
+  "fuelPercent": zod.number().min(postTrackingTelemetryBodyFuelPercentMin).max(postTrackingTelemetryBodyFuelPercentMax),
+  "engineOn": zod.boolean(),
+  "odometerKm": zod.number().int().min(postTrackingTelemetryBodyOdometerKmMin),
+  "engineHours": zod.number().min(postTrackingTelemetryBodyEngineHoursMin),
+  "ecuData": zod.record(zod.string(), zod.union([zod.string().max(postTrackingTelemetryBodyEcuDataOneMax),zod.number()]))
+})
+
+export const PostTrackingTelemetryResponse = zod.object({
+  "received": zod.literal(true)
+})
+
+
