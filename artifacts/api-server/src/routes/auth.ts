@@ -5,6 +5,7 @@ import { db } from "@workspace/db";
 import { users } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
 import { signAccessToken } from "../middlewares/auth";
+import { deliverNotification } from "../lib/notifications";
 
 const router = Router();
 const credentials = z.object({
@@ -14,10 +15,21 @@ const credentials = z.object({
   phone: z.string().min(10).max(20).optional(),
   role: z.enum(["customer", "owner", "operator"]).default("customer"),
 });
+const registrationCredentials = credentials.extend({
+  password: z.string()
+    .min(8)
+    .max(128)
+    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).+$/, {
+      message: "Password must include lowercase, uppercase, a number, and a special character",
+    }),
+  phone: z.string().regex(/^\+[1-9]\d{7,14}$/, {
+    message: "Phone must use international format with country code, e.g. +919876543210",
+  }),
+});
 
 router.post("/register", async (req, res, next) => {
   try {
-    const input = credentials.parse(req.body);
+    const input = registrationCredentials.parse(req.body);
     if (!input.name || !input.phone) return res.status(400).json({ error: "Name and phone are required" });
     const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.email, input.email));
     if (existing) return res.status(409).json({ error: "Email is already registered" });
@@ -26,6 +38,11 @@ router.post("/register", async (req, res, next) => {
       passwordHash: await bcrypt.hash(input.password, 12),
       role: input.role,
     }).returning({ id: users.id, role: users.role });
+    await deliverNotification(
+      { email: input.email, phone: input.phone },
+      "Welcome to RentBuild",
+      `Welcome to RentBuild, ${input.name}! Your account is ready. You can now explore and book equipment.`,
+    );
     return res.status(201).json({ accessToken: signAccessToken(user), user });
   } catch (error) { return next(error); }
 });
