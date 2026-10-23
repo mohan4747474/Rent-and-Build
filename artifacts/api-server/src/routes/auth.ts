@@ -5,6 +5,7 @@ import { db } from "@workspace/db";
 import { users } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
 import { signAccessToken } from "../middlewares/auth";
+import { deliverNotification } from "../lib/notifications";
 
 const router = Router();
 const credentials = z.object({
@@ -37,6 +38,11 @@ router.post("/register", async (req, res, next) => {
       passwordHash: await bcrypt.hash(input.password, 12),
       role: input.role,
     }).returning({ id: users.id, role: users.role });
+    await deliverNotification(
+      { email: input.email, phone: input.phone },
+      "Welcome to RentBuild",
+      `Welcome to RentBuild, ${input.name}! Your account is ready. You can now explore and book equipment.`,
+    );
     return res.status(201).json({ accessToken: signAccessToken(user), user });
   } catch (error) { return next(error); }
 });

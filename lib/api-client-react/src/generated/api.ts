@@ -21,7 +21,9 @@ import type {
 
 import type {
   HealthStatus,
-  RegisterRequest
+  RegisterRequest,
+  TelemetryAcceptedResponse,
+  TelemetryIngestRequest
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -122,6 +124,13 @@ export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, 
 
   return withQueryKey(query, queryOptions.queryKey);
 }
+
+
+
+
+
+
+
 export const getPostAuthRegisterUrl = () => {
 
 
@@ -502,3 +511,99 @@ export function useGetTrackingCurrentEquipmentId<TData = Awaited<ReturnType<type
 
   return withQueryKey(query, queryOptions.queryKey);
 }
+
+
+
+
+
+
+
+export const getPostTrackingTelemetryUrl = () => {
+
+
+
+
+  return `/api/tracking/telemetry`
+}
+
+/**
+ * Stores the reading in current and history telemetry tables, then sends its sensor details to the owner by email and SMS.
+ * @summary Store a sensor reading and notify the equipment owner
+ */
+export const postTrackingTelemetry = async (telemetryIngestRequest: TelemetryIngestRequest, options?: Parameters<typeof customFetch>[1]): Promise<TelemetryAcceptedResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<TelemetryAcceptedResponse>(getPostTrackingTelemetryUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(telemetryIngestRequest)
+  }
+);}
+
+
+
+
+
+export const getPostTrackingTelemetryMutationKey = () => ['postTrackingTelemetry'] as const;
+
+export const getPostTrackingTelemetryMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postTrackingTelemetry>>, TError,PostTrackingTelemetryMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof postTrackingTelemetry>>, TError,PostTrackingTelemetryMutationVariables, TContext> => {
+
+const mutationKey = getPostTrackingTelemetryMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postTrackingTelemetry>>, PostTrackingTelemetryMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  postTrackingTelemetry(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostTrackingTelemetryMutationResult = NonNullable<Awaited<ReturnType<typeof postTrackingTelemetry>>>
+    export type PostTrackingTelemetryMutationBody = BodyType<TelemetryIngestRequest>
+    export type PostTrackingTelemetryMutationError = ErrorType<void>
+    export type PostTrackingTelemetryMutationVariables = {data: BodyType<TelemetryIngestRequest>}
+
+    /**
+ * @summary Store a sensor reading and notify the equipment owner
+ */
+export const usePostTrackingTelemetry = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postTrackingTelemetry>>, TError,PostTrackingTelemetryMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof postTrackingTelemetry>>,
+        TError,
+        PostTrackingTelemetryMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPostTrackingTelemetryMutationOptions(options));
+    }
+

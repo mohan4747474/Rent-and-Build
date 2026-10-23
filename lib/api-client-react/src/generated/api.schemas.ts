@@ -8,6 +8,7 @@
 export interface HealthStatus {
   status: string;
 }
+
 export interface RegisterRequest {
   email: string;
   /**
@@ -19,3 +20,37 @@ export interface RegisterRequest {
   /** @pattern ^\+[1-9][0-9]{7,14}$ */
   phone: string;
 }
+
+export type TelemetryIngestRequestEcuData = {[key: string]: string | number};
+
+export interface TelemetryIngestRequest {
+  equipmentId: string;
+  /**
+     * @minimum -90
+     * @maximum 90
+     */
+  latitude: number;
+  /**
+     * @minimum -180
+     * @maximum 180
+     */
+  longitude: number;
+  /** @minimum 0 */
+  speedKph: number;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  fuelPercent: number;
+  engineOn: boolean;
+  /** @minimum 0 */
+  odometerKm: number;
+  /** @minimum 0 */
+  engineHours: number;
+  ecuData: TelemetryIngestRequestEcuData;
+}
+
+export interface TelemetryAcceptedResponse {
+  received: true;
+}
+
