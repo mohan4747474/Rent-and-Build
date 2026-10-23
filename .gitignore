@@ -13,7 +13,10 @@ out-tsc
 node_modules
 
 # IDEs and editors
-/.github
+/.github/*
+!/.github/agents/
+/.github/agents/*
+!/.github/agents/*.agent.md
 .project
 .classpath
 .c9/
