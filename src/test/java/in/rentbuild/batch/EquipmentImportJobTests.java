@@ -27,6 +27,7 @@ import org.mockito.Mockito;
         "spring.config.location=classpath:/application.properties",
         "spring.datasource.url=jdbc:h2:mem:equipment-import;MODE=PostgreSQL;DB_CLOSE_DELAY=-1",
         "spring.datasource.username=sa",
+        "spring.batch.jdbc.initialize-schema=always",
         "spring.datasource.password=",
         "spring.batch.job.enabled=false"
 })

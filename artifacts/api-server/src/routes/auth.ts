@@ -2,9 +2,7 @@ import { Router } from "express";
 import { randomUUID } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
-import { db } from "@workspace/db";
-import { users } from "@workspace/db/schema";
-import { eq } from "drizzle-orm";
+import { execute, query } from "@workspace/db";
 import { signAccessToken } from "../middlewares/auth";
 import { deliverNotification } from "../lib/notifications";
 
@@ -32,15 +30,24 @@ router.post("/register", async (req, res, next) => {
   try {
     const input = registrationCredentials.parse(req.body);
     if (!input.name || !input.phone) return res.status(400).json({ error: "Name and phone are required" });
-    const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.email, input.email));
+    const [existing] = await query<{ id: string }>(
+      'SELECT id AS "id" FROM users WHERE email = :email AND deleted_at IS NULL',
+      { email: input.email },
+    );
     if (existing) return res.status(409).json({ error: "Email is already registered" });
     const id = randomUUID();
-    await db.insert(users).values({
-      id,
-      email: input.email, name: input.name, phone: input.phone,
-      passwordHash: await bcrypt.hash(input.password, 12),
-      role: input.role,
-    });
+    await execute(
+      `INSERT INTO users (id, email, password_hash, name, phone, role)
+       VALUES (:id, :email, :passwordHash, :name, :phone, :role)`,
+      {
+        id,
+        email: input.email,
+        passwordHash: await bcrypt.hash(input.password, 12),
+        name: input.name,
+        phone: input.phone,
+        role: input.role,
+      },
+    );
     const user = { id, role: input.role };
     await deliverNotification(
       { email: input.email, phone: input.phone },
@@ -69,8 +76,20 @@ router.post("/admin/login", async (req, res, next) => {
 router.post("/login", async (req, res, next) => {
   try {
     const input = credentials.pick({ email: true, password: true }).parse(req.body);
-    const [user] = await db.select().from(users).where(eq(users.email, input.email));
-    if (!user || !(await bcrypt.compare(input.password, user.passwordHash))) {
+    const [user] = await query<{
+      id: string;
+      name: string;
+      email: string;
+      phone: string;
+      role: "customer" | "owner" | "operator" | "admin";
+      password_hash: string;
+    }>(
+      `SELECT id AS "id", name AS "name", email AS "email", phone AS "phone",
+              role AS "role", password_hash AS "password_hash"
+       FROM users WHERE email = :email AND deleted_at IS NULL`,
+      { email: input.email },
+    );
+    if (!user || !(await bcrypt.compare(input.password, user.password_hash))) {
       return res.status(401).json({ error: "Invalid email or password" });
     }
     return res.json({

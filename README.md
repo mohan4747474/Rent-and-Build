@@ -1,37 +1,30 @@
 # Rent-and-Build
 
-## MySQL setup
+## Oracle Database setup
 
-The API and equipment CSV importer use **MySQL 8.4**. For a local database, install Docker Desktop, then start the included MySQL service from the repository root:
+The API and equipment CSV importer use Oracle Database. For the local database settings in this project, the API connects to service `XEPDB1` at `localhost:1521` as user `PROJECT_DB`.
+
+Create a local `.env.local` file (kept out of Git) and add your Oracle password:
 
 ```powershell
-docker compose up -d mysql
-if (-not (Test-Path .env)) { Copy-Item .env.example .env }
+if (-not (Test-Path .env.local)) { Copy-Item .env.example .env.local }
+notepad .env.local
 ```
 
-The included Compose file creates a local `rentbuild` database and user. Its development-only credentials match this connection string in `.env`:
+Set `ORACLE_USER=PROJECT_DB`, `ORACLE_PASSWORD` to your password, and `ORACLE_CONNECT_STRING=localhost:1521/XEPDB1`. The Oracle driver uses these separate settings, so special characters such as `@` in the password do not need URL encoding. The API start script and Spring importer both load `.env.local`; you can also set these values as environment variables.
 
-```dotenv
-DATABASE_URL=mysql://rentbuild:rentbuild_dev_password@127.0.0.1:3306/rentbuild
-```
-
-If you already have a `.env`, update its `DATABASE_URL` instead of copying the sample again. Once MySQL is healthy, create/update the application tables and start the API:
+If Oracle is installed locally, make sure its database service and TNS listener are running. Verify the listener from PowerShell with `Test-NetConnection localhost -Port 1521`. In SQL Developer, connect using host `localhost`, port `1521`, service name `XEPDB1`, and username `PROJECT_DB`; open `lib/db/schema.sql` and run it as a script (F5) once to create the app and Spring Batch tables. Then install workspace dependencies and start the API:
 
 ```powershell
 pnpm.cmd install
-pnpm.cmd --filter @workspace/db run push
 pnpm.cmd run start:api
 ```
 
-The API start script loads the root `.env` automatically. For a hosted MySQL provider, create a MySQL 8 database and a restricted application user, allow connections from the API server, and set `DATABASE_URL` to the provider's URI. Percent-encode special characters in the username or password (for example, `@` as `%40`). Keep provider credentials in environment variables or a secret manager; do not use the local Compose passwords in production.
-
-The Spring Batch importer uses JDBC environment variables rather than `DATABASE_URL`. Its default URL, username, and development password match the local Compose service. For a hosted provider, set `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, and `SPRING_DATASOURCE_PASSWORD` to the provider's JDBC connection details. After the API schema has been created, build and run the importer as described below.
-
-**Existing PostgreSQL data is not converted automatically.** Back up and migrate your data to MySQL before switching an existing deployment; `drizzle-kit push` is for applying the MySQL schema, not for transferring PostgreSQL data.
+The importer reads the same Oracle settings from `.env.local`. The schema script creates the Spring Batch metadata tables along with the application tables. Existing PostgreSQL/MySQL data is not migrated automatically; back up and migrate it separately before switching.
 
 ## Equipment CSV batch importer
 
-The Maven project at the repository root provides a Spring Batch job that imports equipment listings into the existing MySQL `equipment` table. The database must already contain the Rent-and-Build schema, and every CSV `owner_id` must reference an existing user.
+The Maven project at the repository root provides a Spring Batch job that imports equipment listings into the existing Oracle `equipment` table. The database must already contain the Rent-and-Build schema, and every CSV `owner_id` must reference an existing user.
 
 Use Java 17 and Maven to build the executable JAR:
 
@@ -39,7 +32,7 @@ Use Java 17 and Maven to build the executable JAR:
 mvn clean install
 ```
 
-Configure the database with `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, and `SPRING_DATASOURCE_PASSWORD`, then run the importer with a CSV path:
+The importer uses the Oracle credentials in `.env.local` by default. To override them for a hosted database, set `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, and `SPRING_DATASOURCE_PASSWORD`, then run the importer with a CSV path:
 
 ```text
 java -jar target/equipment-importer-1.0.0.jar inputFile=batch-input/equipment.csv
