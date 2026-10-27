@@ -86,13 +86,13 @@ public class EquipmentImportConfiguration {
                 .dataSource(dataSource)
                 .sql("""
                         INSERT INTO equipment (
-                            owner_id, name, category, vehicle_number, license_number,
+                            id, owner_id, name, category, vehicle_number, license_number,
                             rc_card_number, city, description, hourly_rate, daily_rate,
                             working_hours, odometer_km, km_driven, owner_phone,
                             operator_name, operator_phone, operator_experience,
                             sensors_working, ecu_device_id, available
                         ) VALUES (
-                            :ownerId, :name, :category, :vehicleNumber, :licenseNumber,
+                            :id, :ownerId, :name, :category, :vehicleNumber, :licenseNumber,
                             :rcCardNumber, :city, :description, :hourlyRate, :dailyRate,
                             :workingHours, :odometerKm, :kmDriven, :ownerPhone,
                             :operatorName, :operatorPhone, :operatorExperience,
@@ -100,7 +100,8 @@ public class EquipmentImportConfiguration {
                         )
                         """)
                 .itemSqlParameterSourceProvider(item -> new MapSqlParameterSource()
-                        .addValue("ownerId", item.ownerId())
+                        .addValue("id", UUID.randomUUID().toString())
+                        .addValue("ownerId", item.ownerId().toString())
                         .addValue("name", item.name())
                         .addValue("category", item.category())
                         .addValue("vehicleNumber", item.vehicleNumber())

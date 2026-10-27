@@ -22,22 +22,45 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Single deploy job since we're just deploying
   deploy:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
+    env:
+      BASE_PATH: /${{ github.event.repository.name }}/
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
+
+      - name: Build frontend
+        run: pnpm --filter @workspace/rentbuild-india build
+
+      - name: Configure SPA fallback
+        run: cp artifacts/rentbuild-india/dist/public/index.html artifacts/rentbuild-india/dist/public/404.html
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # Upload entire repository
-          path: '.'
+          path: artifacts/rentbuild-india/dist/public
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5

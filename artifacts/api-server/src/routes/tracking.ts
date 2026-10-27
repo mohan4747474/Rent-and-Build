@@ -71,8 +71,7 @@ router.post("/telemetry", async (req, res, next) => {
     };
     await db.transaction(async (tx) => {
       await tx.insert(vehicleTelemetryHistory).values(telemetry);
-      await tx.insert(vehicleTelemetryCurrent).values(telemetry).onConflictDoUpdate({
-        target: vehicleTelemetryCurrent.equipmentId,
+      await tx.insert(vehicleTelemetryCurrent).values(telemetry).onDuplicateKeyUpdate({
         set: {
           latitude: telemetry.latitude,
           longitude: telemetry.longitude,

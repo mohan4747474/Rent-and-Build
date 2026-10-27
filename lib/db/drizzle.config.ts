@@ -10,13 +10,13 @@ if (fs.existsSync(envPath)) {
 
 if (!process.env.DATABASE_URL) {
   throw new Error(
-    `DATABASE_URL is missing. Create ${envPath} from .env.example and set it to your PostgreSQL connection string.`,
+    `DATABASE_URL is missing. Create ${envPath} from .env.example and set it to your MySQL connection string.`,
   );
 }
 
 export default defineConfig({
   schema: path.join(__dirname, "./src/schema/index.ts"),
-  dialect: "postgresql",
+  dialect: "mysql",
   dbCredentials: {
     url: process.env.DATABASE_URL,
   },

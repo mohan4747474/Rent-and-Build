@@ -13,7 +13,7 @@ Guide for AI coding agents working in the Rent-and-Build codebase.
 - `pnpm --filter @workspace/db run push` — push database schema changes (dev only)
 
 **Environment Setup:**
-Copy `.env.example` to `.env` and set `DATABASE_URL` to a PostgreSQL connection string (e.g. `postgresql://user:pass@localhost:5432/rentbuild`).
+Copy `.env.example` to `.env` and set `DATABASE_URL` to a MySQL connection string (e.g. `mysql://rentbuild:rentbuild_dev_password@127.0.0.1:3306/rentbuild`). Use `docker compose up -d mysql` for the local development database.
 
 ## Repository Structure
 
@@ -24,7 +24,7 @@ This is a pnpm monorepo with packages organized in two directories:
 - **`api-server`** — Express.js backend (Node.js 24, CommonJS bundle via esbuild)
   - Routes: `/api/auth`, `/api/payments`, `/api/tracking`, `/api/bookings`, `/api/healthz`
   - Authentication: Clerk + JWT tokens
-  - Database: PostgreSQL via Drizzle ORM (from `@workspace/db`)
+  - Database: MySQL via Drizzle ORM (from `@workspace/db`)
   - Logging: Pino with structured JSON output
   - Security: Helmet, CORS, rate limiting (300 req/15min)
 
@@ -40,7 +40,7 @@ This is a pnpm monorepo with packages organized in two directories:
 
 ### `/lib` — Shared Libraries
 
-- **`db`** — PostgreSQL schema + Drizzle connection
+- **`db`** — MySQL schema + Drizzle connection
   - Exports: Main `db` client + schema definitions
   - Push schema changes with `pnpm --filter @workspace/db run push`
   - Key files: `src/schema/index.ts` (single-file schema definition)
@@ -83,9 +83,9 @@ This is a pnpm monorepo with packages organized in two directories:
 All tables include audit fields:
 ```typescript
 const audit = {
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-  deletedAt: timestamp("deleted_at", { withTimezone: true }),  // Soft delete
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  deletedAt: timestamp("deleted_at", { mode: "date" }),  // Soft delete
 };
 ```
 
@@ -124,7 +124,7 @@ export default router;
 
 Key points:
 - Validate all input with Zod (synchronous, type-safe)
-- Query DB with Drizzle (single `.from(table)` then `.where()`, always `.returning()` on mutations)
+- Query DB with Drizzle (single `.from(table)` then `.where()`). MySQL mutations do not support `.returning()`; query the row separately when needed.
 - Return structured JSON (`{ accessToken, user }`, `{ error: "..." }`)
 - Pass errors to `next(error)` for centralized error handler (already wired in `app.ts`)
 - Status codes: 201 (created), 400 (bad input), 401 (auth), 409 (conflict), 500 (error)
@@ -180,7 +180,7 @@ const allBookings = await db.select().from(bookings)
 // Insert
 const [created] = await db.insert(users).values({
   email, name, passwordHash
-}).returning({ id: users.id, role: users.role });
+});
 
 // Update
 await db.update(bookings).set({ status: "confirmed" })
@@ -192,7 +192,7 @@ await db.update(users).set({ deletedAt: sql`now()` })
 ```
 
 Key points:
-- Always `.returning()` on mutations to get the updated row(s)
+- MySQL mutations do not support `.returning()`; issue a follow-up `SELECT` when the saved row is needed.
 - Results are arrays; destructure first element with `[item]` for single results
 - Use `eq()`, `and()`, `or()`, `desc()`, etc. from drizzle-orm for conditions
 - Soft deletes: set `deletedAt`, filter on queries with `isNull(table.deletedAt)`
@@ -253,7 +253,7 @@ Pino logger outputs structured JSON. Log level defaults to `info` in production,
    router.post("/my-endpoint", async (req, res, next) => {
      try {
        const input = myRequestSchema.parse(req.body);
-       const result = await db.insert(myTable).values(input).returning();
+       const result = await db.insert(myTable).values(input);
        return res.status(201).json(result[0]);
      } catch (error) { next(error); }
    });
@@ -367,7 +367,7 @@ The Clerk middleware is applied globally in `app.ts`. If a route needs to be pub
 
 ### Date Handling
 
-Timestamps in the database are stored with timezone info (`withTimezone: true`). Drizzle returns them as Date objects in JavaScript. When serializing to JSON, they automatically become ISO 8601 strings.
+Drizzle returns timestamp columns as Date objects in JavaScript. When serializing to JSON, they automatically become ISO 8601 strings. MySQL stores these timestamps without a time-zone offset; use UTC in application code.
 
 ### Environment Variables
 
@@ -387,10 +387,8 @@ Internal packages are referenced with workspace protocol: `@workspace/db@workspa
 
 **API calls return 401 Unauthorized**: Check that Clerk is configured (env vars set), and the route is actually secured in the OpenAPI spec with `security: [{ bearerAuth: [] }]`.
 
-**Database migrations fail**: Ensure `DATABASE_URL` is set and the connection works. Use `pnpm --filter @workspace/db run push-force` only if you're absolutely sure of the schema (bypasses safety checks).
+**Database migrations fail**: Ensure MySQL is running and `DATABASE_URL` is set to a valid MySQL connection string. Use `pnpm --filter @workspace/db run push-force` only if you're absolutely sure of the schema (bypasses safety checks).
 
 **Generated code is out of date**: Run `pnpm --filter @workspace/api-spec run codegen` to regenerate from the OpenAPI spec. If changes don't appear, check that the spec file was saved and the title is still "Api".
 
 **Frontend can't reach the API**: Check that both servers are running (`pnpm run start:api` and `pnpm run start:dev`). The frontend expects the API at `/api` relative to its host. For local development, ensure CORS is enabled in the API server (it is, but check `app.ts`).
-
-

@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { randomUUID } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { db } from "@workspace/db";
@@ -33,11 +34,14 @@ router.post("/register", async (req, res, next) => {
     if (!input.name || !input.phone) return res.status(400).json({ error: "Name and phone are required" });
     const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.email, input.email));
     if (existing) return res.status(409).json({ error: "Email is already registered" });
-    const [user] = await db.insert(users).values({
+    const id = randomUUID();
+    await db.insert(users).values({
+      id,
       email: input.email, name: input.name, phone: input.phone,
       passwordHash: await bcrypt.hash(input.password, 12),
       role: input.role,
-    }).returning({ id: users.id, role: users.role });
+    });
+    const user = { id, role: input.role };
     await deliverNotification(
       { email: input.email, phone: input.phone },
       "Welcome to RentBuild",

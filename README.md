@@ -1,8 +1,37 @@
 # Rent-and-Build
 
+## MySQL setup
+
+The API and equipment CSV importer use **MySQL 8.4**. For a local database, install Docker Desktop, then start the included MySQL service from the repository root:
+
+```powershell
+docker compose up -d mysql
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
+```
+
+The included Compose file creates a local `rentbuild` database and user. Its development-only credentials match this connection string in `.env`:
+
+```dotenv
+DATABASE_URL=mysql://rentbuild:rentbuild_dev_password@127.0.0.1:3306/rentbuild
+```
+
+If you already have a `.env`, update its `DATABASE_URL` instead of copying the sample again. Once MySQL is healthy, create/update the application tables and start the API:
+
+```powershell
+pnpm.cmd install
+pnpm.cmd --filter @workspace/db run push
+pnpm.cmd run start:api
+```
+
+The API start script loads the root `.env` automatically. For a hosted MySQL provider, create a MySQL 8 database and a restricted application user, allow connections from the API server, and set `DATABASE_URL` to the provider's URI. Percent-encode special characters in the username or password (for example, `@` as `%40`). Keep provider credentials in environment variables or a secret manager; do not use the local Compose passwords in production.
+
+The Spring Batch importer uses JDBC environment variables rather than `DATABASE_URL`. Its default URL, username, and development password match the local Compose service. For a hosted provider, set `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, and `SPRING_DATASOURCE_PASSWORD` to the provider's JDBC connection details. After the API schema has been created, build and run the importer as described below.
+
+**Existing PostgreSQL data is not converted automatically.** Back up and migrate your data to MySQL before switching an existing deployment; `drizzle-kit push` is for applying the MySQL schema, not for transferring PostgreSQL data.
+
 ## Equipment CSV batch importer
 
-The Maven project at the repository root provides a Spring Batch job that imports equipment listings into the existing PostgreSQL `equipment` table. The database must already contain the Rent-and-Build schema, and every CSV `owner_id` must reference an existing user.
+The Maven project at the repository root provides a Spring Batch job that imports equipment listings into the existing MySQL `equipment` table. The database must already contain the Rent-and-Build schema, and every CSV `owner_id` must reference an existing user.
 
 Use Java 17 and Maven to build the executable JAR:
 
