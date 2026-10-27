@@ -10,10 +10,9 @@ Guide for AI coding agents working in the Rent-and-Build codebase.
 - `pnpm run build` — typecheck all packages, then build (required before commit)
 - `pnpm run typecheck` — full TypeScript check across all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push database schema changes (dev only)
 
 **Environment Setup:**
-Copy `.env.example` to `.env` and set `DATABASE_URL` to a PostgreSQL connection string (e.g. `postgresql://user:pass@localhost:5432/rentbuild`).
+Copy `.env.example` to `.env.local` and set `ORACLE_USER`, `ORACLE_PASSWORD`, and `ORACLE_CONNECT_STRING` for the local Oracle database.
 
 ## Repository Structure
 
@@ -24,7 +23,7 @@ This is a pnpm monorepo with packages organized in two directories:
 - **`api-server`** — Express.js backend (Node.js 24, CommonJS bundle via esbuild)
   - Routes: `/api/auth`, `/api/payments`, `/api/tracking`, `/api/bookings`, `/api/healthz`
   - Authentication: Clerk + JWT tokens
-  - Database: PostgreSQL via Drizzle ORM (from `@workspace/db`)
+  - Database: Oracle Database via node-oracledb (from `@workspace/db`)
   - Logging: Pino with structured JSON output
   - Security: Helmet, CORS, rate limiting (300 req/15min)
 
@@ -40,10 +39,9 @@ This is a pnpm monorepo with packages organized in two directories:
 
 ### `/lib` — Shared Libraries
 
-- **`db`** — PostgreSQL schema + Drizzle connection
-  - Exports: Main `db` client + schema definitions
-  - Push schema changes with `pnpm --filter @workspace/db run push`
-  - Key files: `src/schema/index.ts` (single-file schema definition)
+- **`db`** — Oracle Database pool and parameterized query helpers
+  - Apply schema once with SQL Developer or SQLcl using `lib/db/schema.sql`
+  - Key file: `src/index.ts` (connection pool and query helpers)
 
 - **`api-spec`** — OpenAPI/Swagger spec (YAML) + Orval code generator
   - Source of truth: `openapi.yaml` (title must be "Api" for export paths to work)
@@ -80,18 +78,7 @@ This is a pnpm monorepo with packages organized in two directories:
 
 ### Database Schema Patterns
 
-All tables include audit fields:
-```typescript
-const audit = {
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-  deletedAt: timestamp("deleted_at", { withTimezone: true }),  // Soft delete
-};
-```
-
-Enums for status fields (e.g., `bookingStatusEnum`, `paymentStatusEnum`) enforce type safety at DB level.
-
-Foreign keys use UUID primary keys with `.references()` to maintain referential integrity.
+The Oracle DDL source of truth is `lib/db/schema.sql`. Tables use 36-character UUID strings, `TIMESTAMP WITH TIME ZONE` audit fields, and foreign keys for relationships. Apply schema changes with SQL Developer or SQLcl.
 
 ## Key Patterns
 
@@ -101,8 +88,7 @@ Foreign keys use UUID primary keys with `.references()` to maintain referential 
 // Patterns in api-server/src/routes/auth.ts, payment.ts, etc.
 import { Router } from "express";
 import { z } from "zod";
-import { db } from "@workspace/db";
-import { users } from "@workspace/db/schema";
+import { query } from "@workspace/db";
 
 const router = Router();
 
@@ -112,7 +98,10 @@ const schema = z.object({ email: z.string().email(), password: z.string().min(8)
 router.post("/login", async (req, res, next) => {
   try {
     const input = schema.parse(req.body);
-    const [user] = await db.select().from(users).where(eq(users.email, input.email));
+    const [user] = await query<{ id: string }>(
+      'SELECT id AS "id" FROM users WHERE email = :email',
+      { email: input.email },
+    );
     return res.json({ accessToken: signAccessToken(user), user });
   } catch (error) {
     next(error);  // Express error handler will respond with JSON error
@@ -124,7 +113,8 @@ export default router;
 
 Key points:
 - Validate all input with Zod (synchronous, type-safe)
-- Query DB with Drizzle (single `.from(table)` then `.where()`, always `.returning()` on mutations)
+- Access Oracle through `query()` and `execute()` from `@workspace/db`.
+- Bind all runtime values by name (for example `:email`); never interpolate user input into SQL.
 - Return structured JSON (`{ accessToken, user }`, `{ error: "..." }`)
 - Pass errors to `next(error)` for centralized error handler (already wired in `app.ts`)
 - Status codes: 201 (created), 400 (bad input), 401 (auth), 409 (conflict), 500 (error)
@@ -163,43 +153,29 @@ Key points:
 - Use `isPending`, `isError`, `data` from mutation/query result
 - Forms with React Hook Form for state management
 
-### Database Queries (Drizzle)
+### Database Queries (Oracle)
 
 ```typescript
-import { eq, desc, and } from "drizzle-orm";
-import { db, users, bookings } from "@workspace/db";
+import { query, execute } from "@workspace/db";
 
-// Select one
-const [user] = await db.select().from(users).where(eq(users.email, email));
-
-// Select multiple
-const allBookings = await db.select().from(bookings)
-  .where(and(eq(bookings.userId, id), desc(bookings.createdAt)))
-  .limit(10);
-
-// Insert
-const [created] = await db.insert(users).values({
-  email, name, passwordHash
-}).returning({ id: users.id, role: users.role });
-
-// Update
-await db.update(bookings).set({ status: "confirmed" })
-  .where(eq(bookings.id, bookingId));
-
-// Soft delete (only update deletedAt, don't actually delete)
-await db.update(users).set({ deletedAt: sql`now()` })
-  .where(eq(users.id, userId));
+const [user] = await query<{ id: string }>(
+  'SELECT id AS "id" FROM users WHERE email = :email',
+  { email },
+);
+await execute(
+  "UPDATE bookings SET status = :status WHERE id = :bookingId",
+  { status: "confirmed", bookingId },
+);
 ```
 
 Key points:
-- Always `.returning()` on mutations to get the updated row(s)
-- Results are arrays; destructure first element with `[item]` for single results
-- Use `eq()`, `and()`, `or()`, `desc()`, etc. from drizzle-orm for conditions
-- Soft deletes: set `deletedAt`, filter on queries with `isNull(table.deletedAt)`
+- Use Oracle bind variables (`:name`) for all runtime values; never interpolate user input into SQL.
+- Select queries return arrays; destructure the first element with `[item]` for a single row.
+- Soft deletes: update `deleted_at` and filter on `deleted_at IS NULL`.
 
 ### TypeScript & Validation
 
-- Drizzle schema automatically generates types (use `typeof users.$inferSelect` for row type)
+- Define result types for Oracle query rows with `query<T>()`.
 - Zod validates at API boundaries (always call `.parse()` or `.parseAsync()`)
 - Generated API client types come from OpenAPI spec → no manual typing needed for API responses
 - Backend routes should validate with Zod before touching the DB
@@ -249,12 +225,17 @@ Pino logger outputs structured JSON. Log level defaults to `info` in production,
 3. **Implement backend route** in `api-server/src/routes/my-endpoint.ts`:
    ```typescript
    import { myRequestSchema } from "@workspace/api-zod";
+   import { execute } from "@workspace/db";
+   import { randomUUID } from "node:crypto";
    
    router.post("/my-endpoint", async (req, res, next) => {
      try {
        const input = myRequestSchema.parse(req.body);
-       const result = await db.insert(myTable).values(input).returning();
-       return res.status(201).json(result[0]);
+       await execute(
+         "INSERT INTO my_table (id, field1) VALUES (:id, :field1)",
+         { id: randomUUID(), field1: input.field1 },
+       );
+       return res.status(201).json({ created: true });
      } catch (error) { next(error); }
    });
    ```
@@ -269,9 +250,8 @@ Pino logger outputs structured JSON. Log level defaults to `info` in production,
 
 ### Modifying Database Schema
 
-1. **Edit schema** in `lib/db/src/schema/index.ts`
-2. **Push changes** with `pnpm --filter @workspace/db run push` (uses Drizzle migrations)
-3. **Regenerate types** (happens automatically via TypeScript)
+1. **Edit schema** in `lib/db/schema.sql`
+2. **Apply the DDL** using SQL Developer or SQLcl while connected to Oracle.
 
 ### Building for Production
 
@@ -317,7 +297,7 @@ pnpm run typecheck    # Quick TypeScript check across all packages
 | File/Directory | Purpose |
 |---|---|
 | `lib/api-spec/openapi.yaml` | Source of truth for API contract |
-| `lib/db/src/schema/index.ts` | All database tables, enums, and relationships |
+| `lib/db/schema.sql` | Oracle tables, constraints, and batch metadata schema |
 | `artifacts/api-server/src/routes/` | API route implementations, one file per domain |
 | `artifacts/rentbuild-india/src/App.tsx` | Main React app (stores app-level state) |
 | `.env.example` | Template for required environment variables |
@@ -330,7 +310,7 @@ pnpm run typecheck    # Quick TypeScript check across all packages
 - Routes: `/api/<domain>/<action>` (e.g., `/api/auth/login`, `/api/bookings/create`)
 - Database tables: snake_case (e.g., `users`, `equipment_tracking`)
 - TypeScript files: kebab-case for utilities/components, PascalCase for React components
-- Environment variables: SCREAMING_SNAKE_CASE (e.g., `DATABASE_URL`, `CLERK_PUBLISHABLE_KEY`)
+- Environment variables: SCREAMING_SNAKE_CASE (e.g., `ORACLE_CONNECT_STRING`, `CLERK_PUBLISHABLE_KEY`)
 
 ### Code Style
 
@@ -345,9 +325,8 @@ pnpm run typecheck    # Quick TypeScript check across all packages
 
 The OpenAPI spec title **must be "Api"** — the Orval generator uses this to generate exports. Changing it breaks import paths in `api-client-react` and `api-zod`.
 
-### Drizzle Select Results
-
-Drizzle always returns arrays, even for single-row queries:
+### Oracle Query Results
+The Oracle `query()` helper returns arrays; destructure the first element for a single row:
 ```typescript
 const [user] = await db.select().from(users).limit(1);  // ✓ Correct
 const user = await db.select().from(users).limit(1);    // ✗ Wrong (is an array)
@@ -367,11 +346,11 @@ The Clerk middleware is applied globally in `app.ts`. If a route needs to be pub
 
 ### Date Handling
 
-Timestamps in the database are stored with timezone info (`withTimezone: true`). Drizzle returns them as Date objects in JavaScript. When serializing to JSON, they automatically become ISO 8601 strings.
+Oracle timestamps are returned as JavaScript Date objects. Use UTC in application code.
 
 ### Environment Variables
 
-The API server will throw an error if `DATABASE_URL` is missing. Other variables like `CLERK_PUBLISHABLE_KEY` are optional but authentication won't work without them. Check `.env.example` for required variables.
+The API server requires `ORACLE_USER`, `ORACLE_PASSWORD`, and `ORACLE_CONNECT_STRING`. Other variables like `CLERK_PUBLISHABLE_KEY` are optional but authentication won't work without them. Check `.env.example` for required variables.
 
 ### React Query Mutation Names
 
@@ -387,10 +366,8 @@ Internal packages are referenced with workspace protocol: `@workspace/db@workspa
 
 **API calls return 401 Unauthorized**: Check that Clerk is configured (env vars set), and the route is actually secured in the OpenAPI spec with `security: [{ bearerAuth: [] }]`.
 
-**Database migrations fail**: Ensure `DATABASE_URL` is set and the connection works. Use `pnpm --filter @workspace/db run push-force` only if you're absolutely sure of the schema (bypasses safety checks).
+**Database connection fails**: Ensure the Oracle listener is running on port 1521, service `XEPDB1` is available, and `ORACLE_USER`, `ORACLE_PASSWORD`, and `ORACLE_CONNECT_STRING` are set in `.env.local`.
 
 **Generated code is out of date**: Run `pnpm --filter @workspace/api-spec run codegen` to regenerate from the OpenAPI spec. If changes don't appear, check that the spec file was saved and the title is still "Api".
 
 **Frontend can't reach the API**: Check that both servers are running (`pnpm run start:api` and `pnpm run start:dev`). The frontend expects the API at `/api` relative to its host. For local development, ensure CORS is enabled in the API server (it is, but check `app.ts`).
-
-
