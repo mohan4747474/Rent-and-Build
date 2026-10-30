@@ -6,6 +6,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useState,
 } from 'react';
@@ -278,6 +279,7 @@ const defaultSensor: SensorData = {
 };
 
 const fmt = (value: number) => new Intl.NumberFormat('en-IN').format(value);
+const defaultPhonePrefix = '+91';
 const strongPasswordPattern = '(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[^A-Za-z0-9]).{8,}';
 const internationalPhonePattern = '\\+[1-9][0-9]{7,14}';
 const vehicleNumberPattern = '[A-Za-z][A-Za-z0-9 -]*';
@@ -285,6 +287,16 @@ const hasStrongPassword = (password: string) =>
   /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/.test(password);
 const isInternationalPhone = (phone: string) => /^\+[1-9][0-9]{7,14}$/.test(phone);
 const isValidVehicleNumber = (vehicleNumber: string) => /^[A-Za-z][A-Za-z0-9 -]*$/.test(vehicleNumber.trim());
+const to24HourTime = (time: string) => {
+  const match = /^(0[1-9]|1[0-2]):([0-5]\d) (AM|PM)$/.exec(time);
+  if (!match) return '';
+  const hour = Number(match[1]) % 12 + (match[3] === 'PM' ? 12 : 0);
+  return `${String(hour).padStart(2, '0')}:${match[2]}`;
+};
+const combineBookingDateTime = (date: string, time: string) => {
+  const convertedTime = to24HourTime(time);
+  return date && convertedTime ? `${date}T${convertedTime}` : '';
+};
 
 const vehicleExportFields: { label: string; getValue: (item: Equipment) => string | number | boolean }[] = [
   { label: 'Vehicle ID', getValue: (item) => item.id },
@@ -350,7 +362,7 @@ const bookingExportFields: {
 ];
 
 function downloadVehicleCsv(
-  equipment: Equipment[],
+  equipment: Equipment,
   sensors: Record<string, SensorData>,
   sensorHistory: SensorHistoryRecord[],
   bookings: Booking[],
@@ -366,42 +378,41 @@ function downloadVehicleCsv(
   const emptySensor = sensorExportFields.map(() => '');
   const emptyBooking = bookingExportFields.map(() => '');
 
-  for (const item of equipment) {
-    const vehicleDetails = vehicleExportFields.map(({ getValue }) =>
-      getValue(item),
-    );
-    const liveSensor = { ...defaultSensor, ...sensors[item.id] };
+  const item = equipment;
+  const vehicleDetails = vehicleExportFields.map(({ getValue }) =>
+    getValue(item),
+  );
+  const liveSensor = { ...defaultSensor, ...sensors[item.id] };
+  rows.push([
+    'Live sensor reading',
+    ...vehicleDetails,
+    liveSensor.lastSync,
+    ...sensorExportFields.map(({ key }) => liveSensor[key]),
+    ...emptyBooking,
+  ]);
+
+  for (const record of sensorHistory
+    .filter(({ equipmentId }) => equipmentId === item.id)
+    .sort((a, b) => a.recordedAt.localeCompare(b.recordedAt))) {
     rows.push([
-      'Live sensor reading',
+      'Past sensor reading',
       ...vehicleDetails,
-      liveSensor.lastSync,
-      ...sensorExportFields.map(({ key }) => liveSensor[key]),
+      record.recordedAt,
+      ...sensorExportFields.map(({ key }) => record.sensor[key]),
       ...emptyBooking,
     ]);
+  }
 
-    for (const record of sensorHistory
-      .filter(({ equipmentId }) => equipmentId === item.id)
-      .sort((a, b) => a.recordedAt.localeCompare(b.recordedAt))) {
-      rows.push([
-        'Past sensor reading',
-        ...vehicleDetails,
-        record.recordedAt,
-        ...sensorExportFields.map(({ key }) => record.sensor[key]),
-        ...emptyBooking,
-      ]);
-    }
-
-    for (const booking of bookings.filter(
-      ({ equipmentId }) => equipmentId === item.id,
-    )) {
-      rows.push([
-        'Booking',
-        ...vehicleDetails,
-        '',
-        ...emptySensor,
-        ...bookingExportFields.map(({ getValue }) => getValue(booking)),
-      ]);
-    }
+  for (const booking of bookings.filter(
+    ({ equipmentId }) => equipmentId === item.id,
+  )) {
+    rows.push([
+      'Booking',
+      ...vehicleDetails,
+      '',
+      ...emptySensor,
+      ...bookingExportFields.map(({ getValue }) => getValue(booking)),
+    ]);
   }
   const csv = [header, ...rows]
     .map((row) =>
@@ -414,7 +425,8 @@ function downloadVehicleCsv(
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = `rentbuild-vehicle-export-${new Date().toISOString().slice(0, 10)}.csv`;
+  const safeVehicleNumber = item.vehicleNumber.replace(/[^A-Za-z0-9-]+/g, '-');
+  link.download = `rentbuild-${safeVehicleNumber}-${new Date().toISOString().slice(0, 10)}.csv`;
   document.body.appendChild(link);
   link.click();
   link.remove();
@@ -486,6 +498,12 @@ function AppStateProvider({ children }: { children: ReactNode }) {
     'rb-sensor-history',
     [],
   );
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    root.classList.toggle('dark', dark);
+    root.classList.toggle('light', !dark);
+    root.style.colorScheme = dark ? 'dark' : 'light';
+  }, [dark]);
   useEffect(() => {
     setSensorHistory((current) => {
       const latestByEquipment = new Map<string, SensorData>();
@@ -565,12 +583,37 @@ function ThemeToggle() {
   const { dark, setDark } = useAppState();
   return (
     <button
+      type="button"
       onClick={() => setDark(!dark)}
       className="grid h-9 w-9 place-items-center rounded-full border border-border text-muted-foreground transition-colors hover:border-primary hover:text-primary"
       aria-label={dark ? 'Use light theme' : 'Use dark theme'}
     >
       {dark ? <Sun size={16} /> : <Moon size={16} />}
     </button>
+  );
+}
+
+function TimePicker({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  const [hour = '09', minute = '00', period = 'AM'] = value.split(/[: ]/);
+  const update = (nextHour = hour, nextMinute = minute, nextPeriod = period) =>
+    onChange(`${nextHour}:${nextMinute} ${nextPeriod}`);
+  const selectClassName = 'h-11 border border-input bg-background px-2 text-sm';
+  return (
+    <label>
+      <span className="mono-font mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">{label}</span>
+      <span className="grid grid-cols-[1fr_1fr_auto] gap-2">
+        <select aria-label={`${label} hour`} value={hour} onChange={(event) => update(event.target.value)} className={selectClassName}>
+          {Array.from({ length: 12 }, (_, index) => String(index + 1).padStart(2, '0')).map((item) => <option key={item}>{item}</option>)}
+        </select>
+        <select aria-label={`${label} minute`} value={minute} onChange={(event) => update(hour, event.target.value)} className={selectClassName}>
+          {Array.from({ length: 60 }, (_, index) => String(index).padStart(2, '0')).map((item) => <option key={item}>{item}</option>)}
+        </select>
+        <select aria-label={`${label} AM or PM`} value={period} onChange={(event) => update(hour, minute, event.target.value)} className={selectClassName}>
+          <option>AM</option>
+          <option>PM</option>
+        </select>
+      </span>
+    </label>
   );
 }
 
@@ -747,7 +790,7 @@ function AuthPage({ mode }: { mode: 'sign-in' | 'sign-up' }) {
   if (localDemoMode) {
     const auth = useContext(LocalAuthContext);
     const [location] = useLocation();
-    const [form, setForm] = useState({ name: '', email: '', phone: '', password: '', role: 'customer' as WorkspaceUser['role'] });
+    const [form, setForm] = useState({ name: '', email: '', phone: defaultPhonePrefix, password: '', role: 'customer' as WorkspaceUser['role'] });
     const [error, setError] = useState('');
     const submit = (event: FormEvent) => {
       event.preventDefault();
@@ -852,7 +895,7 @@ function LoadingPage() {
 function ProfilePage() {
   const { profile, setProfile, addNotification } = useAppState();
   const { user } = useWorkspaceUser();
-  const [form, setForm] = useState({ ...profile, phone: profile.phone || user?.phone || '' });
+  const [form, setForm] = useState({ ...profile, phone: profile.phone || user?.phone || defaultPhonePrefix });
   const [phoneError, setPhoneError] = useState('');
   const save = (event: FormEvent) => {
     event.preventDefault();
@@ -874,16 +917,20 @@ function BookingPage() {
   const [, setLocation] = useLocation();
   const item = equipment.find((machine) => machine.id === id) ?? equipment[0];
   const [step, setStep] = useState(1);
-  const [details, setDetails] = useState<UserProfile>({ name: profile.name || user?.fullName || '', phone: profile.phone || user?.phone || '', email: profile.email || user?.primaryEmailAddress?.emailAddress || '' });
+  const [details, setDetails] = useState<UserProfile>({ name: profile.name || user?.fullName || '', phone: profile.phone || user?.phone || defaultPhonePrefix, email: profile.email || user?.primaryEmailAddress?.emailAddress || '' });
   const [paymentMethod, setPaymentMethod] = useState('UPI / VPA');
   const [paymentStatus, setPaymentStatus] = useState<'idle' | 'authorizing' | 'paid'>('idle');
   const [bookingId, setBookingId] = useState('');
   const [location, setDeliveryLocation] = useState(item.city);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [startTime, setStartTime] = useState('09:00 AM');
+  const [endTime, setEndTime] = useState('05:00 PM');
   const [scheduleError, setScheduleError] = useState('');
-  const startAt = startDate ? new Date(startDate).getTime() : 0;
-  const endAt = endDate ? new Date(endDate).getTime() : 0;
+  const startDateTime = combineBookingDateTime(startDate, startTime);
+  const endDateTime = combineBookingDateTime(endDate, endTime);
+  const startAt = startDateTime ? new Date(startDateTime).getTime() : 0;
+  const endAt = endDateTime ? new Date(endDateTime).getTime() : 0;
   const rentalDays = startAt && endAt && endAt > startAt ? Math.max(1, Math.ceil((endAt - startAt) / (24 * 60 * 60 * 1000))) : 0;
   const rentalSubtotal = item.price * rentalDays;
   const platformFee = Math.round(rentalSubtotal * .08);
@@ -895,7 +942,7 @@ function BookingPage() {
       setScheduleError('Enter a valid phone number in international format, starting with + and the country code.');
       return;
     }
-    if (!startDate || !endDate || endAt <= startAt) {
+    if (!startDateTime || !endDateTime || endAt <= startAt) {
       setScheduleError('Select a valid end date and time after the start date and time.');
       return;
     }
@@ -905,9 +952,9 @@ function BookingPage() {
     setStep(2);
   };
   const authorizePayment = () => { setPaymentStatus('authorizing'); window.setTimeout(() => { setPaymentStatus('paid'); addNotification({ title: 'Payment authorized', body: `Payment preference ${paymentMethod} is ready for ${item.name}.`, kind: 'payment', read: false }); setStep(3); }, 900); };
-  const confirmBooking = () => { const newId = `RB-${String(Date.now()).slice(-6)}`; setBookingId(newId); addBooking({ id: newId, equipmentId: item.id, equipmentName: item.name, location, startDate, endDate, total, paymentMethod, paymentStatus: 'paid', status: 'confirmed', createdAt: new Date().toISOString() }); addNotification({ title: 'Booking confirmed', body: `${item.name} is reserved for ${location}.`, kind: 'booking', read: false }); setStep(4); };
+  const confirmBooking = () => { const newId = `RB-${String(Date.now()).slice(-6)}`; setBookingId(newId); addBooking({ id: newId, equipmentId: item.id, equipmentName: item.name, location, startDate: startDateTime, endDate: endDateTime, total, paymentMethod, paymentStatus: 'paid', status: 'confirmed', createdAt: new Date().toISOString() }); addNotification({ title: 'Booking confirmed', body: `${item.name} is reserved for ${location}.`, kind: 'booking', read: false }); setStep(4); };
   const paymentMethods = ['UPI / VPA', 'UPI QR', 'UPI Intent', 'Card', 'Net banking', 'Wallets (GPay / PhonePe / Paytm)'];
-  return <PageFrame><div className="px-5 py-12 lg:px-9 lg:py-20"><Link href="/browse" className="mb-7 inline-flex items-center gap-2 text-xs font-semibold text-muted-foreground"><ArrowLeft size={14} /> Back to equipment</Link><div className="grid gap-8 lg:grid-cols-[1fr_.75fr]"><div><div className="mono-font text-[10px] uppercase tracking-[.18em] text-primary">Protected booking / {String(step).padStart(2, '0')} of 04</div><h1 className="display-font mt-3 text-5xl font-bold uppercase leading-[.9]">{step === 1 ? 'Schedule your machine.' : step === 2 ? 'Choose payment.' : step === 3 ? 'Review before booking.' : 'Your machine is reserved.'}</h1><div className="mt-8 grid grid-cols-4 gap-2">{[['1', 'Details'], ['2', 'Payment'], ['3', 'Review'], ['4', 'Confirmed']].map(([number, label], index) => <div key={number} className={`border-t-2 pt-2 ${step > index ? 'border-primary text-foreground' : 'border-border text-muted-foreground'}`}><div className="mono-font text-[10px]">{number}</div><div className="mt-1 text-[10px] font-semibold">{label}</div></div>)}</div>{step === 1 && <form onSubmit={saveDetails} className="mt-8 max-w-xl border border-border bg-card p-6"><div className="mb-6 flex items-start gap-3 border-l-2 border-primary bg-primary/5 p-4 text-xs leading-5 text-muted-foreground"><LockKeyhole size={16} className="mt-0.5 shrink-0 text-primary" />Choose the work schedule and provide contact details before payment is authorized.</div><div className="grid gap-4 sm:grid-cols-2"><label><span className="mono-font mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">Start date and time *</span><input required type="datetime-local" value={startDate} onChange={(e) => { setStartDate(e.target.value); setScheduleError(''); }} className="h-11 w-full border border-input bg-background px-3 text-sm" /></label><label><span className="mono-font mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">End date and time *</span><input required type="datetime-local" min={startDate || undefined} value={endDate} onChange={(e) => { setEndDate(e.target.value); setScheduleError(''); }} className="h-11 w-full border border-input bg-background px-3 text-sm" /></label><label className="sm:col-span-2"><span className="mono-font mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">Full name *</span><input required value={details.name} onChange={(e) => setDetails({ ...details, name: e.target.value })} className="h-11 w-full border border-input bg-background px-3 text-sm" placeholder="Responsible person" /></label><label><span className="mono-font mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">Phone number *</span><input required type="tel" inputMode="tel" pattern={internationalPhonePattern} title="Enter + followed by the country code and phone number, digits only (for example, +919876543210)." value={details.phone} onChange={(e) => setDetails({ ...details, phone: e.target.value })} className="h-11 w-full border border-input bg-background px-3 text-sm" placeholder="+919876543210" /></label><label><span className="mono-font mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">Email ID *</span><input required type="email" value={details.email} onChange={(e) => setDetails({ ...details, email: e.target.value })} className="h-11 w-full border border-input bg-background px-3 text-sm" placeholder="you@company.com" /></label><label className="sm:col-span-2"><span className="mono-font mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">Delivery location *</span><input required value={location} onChange={(e) => setDeliveryLocation(e.target.value)} className="h-11 w-full border border-input bg-background px-3 text-sm" placeholder="Job site city" /></label></div>{scheduleError && <p className="mt-4 text-xs text-red-400">{scheduleError}</p>}<button className="mt-6 flex h-11 w-full items-center justify-center gap-2 bg-primary text-xs font-bold text-primary-foreground">CONTINUE TO PAYMENT <ArrowRight size={15} /></button></form>}{step === 2 && <div className="mt-8 max-w-xl border border-border bg-card p-6"><div className="flex items-center justify-between"><div><div className="mono-font text-[10px] uppercase tracking-wider text-primary">Razorpay checkout</div><h2 className="mt-2 text-xl font-bold">Select a payment method.</h2></div><CreditCard className="text-primary" /></div><div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{paymentMethods.map((method) => <button key={method} onClick={() => setPaymentMethod(method)} className={`min-h-[92px] border p-3 text-left ${paymentMethod === method ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/60'}`}><div className="grid h-7 w-7 place-items-center bg-background text-primary">{method.includes('UPI') ? <Zap size={14} /> : method === 'Card' ? <CreditCard size={14} /> : <WalletCards size={14} />}</div><div className="mt-3 text-xs font-bold">{method}</div></button>)}</div><div className="mt-6 border-t border-border pt-4 text-xs text-muted-foreground">Razorpay supports UPI QR, UPI Intent, cards, net banking, Google Pay, PhonePe, and Paytm. Live payment capture starts when Razorpay keys are configured; local mode records a safe demo authorization.</div><button onClick={authorizePayment} disabled={paymentStatus === 'authorizing'} className="mt-6 flex h-11 w-full items-center justify-center gap-2 bg-primary text-xs font-bold text-primary-foreground disabled:opacity-60">{paymentStatus === 'authorizing' ? 'AUTHORIZING PAYMENT…' : 'AUTHORIZE PAYMENT'} <ArrowRight size={15} /></button></div>}{step === 3 && <div className="mt-8 max-w-xl border border-border bg-card p-6"><div className="flex items-start gap-3 border border-emerald-400/30 bg-emerald-400/10 p-4"><Check size={18} className="text-emerald-400" /><div><div className="text-sm font-bold">Payment authorized</div><div className="mt-1 text-xs text-muted-foreground">Now confirm the booking separately so the owner can receive the work order.</div></div></div><div className="mt-6 space-y-3 text-sm"><div className="flex justify-between border-b border-border pb-3"><span className="text-muted-foreground">Customer</span><b>{details.name}</b></div><div className="flex justify-between border-b border-border pb-3"><span className="text-muted-foreground">Delivery</span><b>{location}</b></div><div className="flex justify-between border-b border-border pb-3"><span className="text-muted-foreground">Payment</span><b>{paymentMethod}</b></div><div className="flex justify-between pt-2"><span className="font-bold">Total</span><b className="text-xl text-primary">₹{fmt(total)}</b></div></div><button onClick={confirmBooking} className="mt-7 flex h-12 w-full items-center justify-center gap-2 bg-primary text-sm font-bold text-primary-foreground">CONFIRM BOOKING <Check size={16} /></button></div>}{step === 4 && <div className="mt-8 max-w-xl border border-emerald-400/30 bg-emerald-400/10 p-6"><div className="grid h-12 w-12 place-items-center rounded-full bg-emerald-400 text-[#132219]"><Check size={23} /></div><h2 className="mt-5 text-2xl font-bold">Booking confirmed.</h2><p className="mt-2 text-sm leading-6 text-muted-foreground">The owner has been notified and the equipment is reserved for your site. Your payment authorization and booking confirmation are both recorded.</p><div className="mt-6 grid gap-3 sm:grid-cols-2"><div className="border border-border bg-background/40 p-4"><div className="text-xs text-muted-foreground">Booking ID</div><div className="mt-1 font-bold">{bookingId}</div></div><div className="border border-border bg-background/40 p-4"><div className="text-xs text-muted-foreground">Next state</div><div className="mt-1 font-bold text-primary">Owner confirmation</div></div></div><div className="mt-6 flex flex-wrap gap-3"><Link href="/bookings" className="flex h-11 items-center gap-2 bg-primary px-4 text-xs font-bold text-primary-foreground">VIEW MY BOOKINGS <ArrowRight size={14} /></Link><Link href="/notifications" className="flex h-11 items-center gap-2 border border-border px-4 text-xs font-bold hover:border-primary"><Bell size={14} /> VIEW NOTIFICATIONS</Link></div></div>}</div><aside className="h-fit border border-border bg-card p-5 lg:sticky lg:top-24"><div className="mono-font text-[10px] uppercase tracking-wider text-primary">Selected equipment</div><div className="mt-4"><EquipmentIllustration kind={item.image} initials={item.type.slice(0, 3).toUpperCase()} /><h2 className="mt-4 text-lg font-bold">{item.name}</h2><div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground"><MapPin size={13} />{item.city} · {item.owner}</div></div>  <div className="mt-5 space-y-3 border-t border-border pt-4 text-xs"><div className="flex justify-between"><span className="text-muted-foreground">Rental × {rentalDays || 0} days</span><span>₹{fmt(rentalSubtotal)}</span></div><div className="flex justify-between"><span className="text-muted-foreground">Delivery &amp; platform</span><span>₹{fmt(platformFee)}</span></div><div className="flex justify-between"><span className="text-muted-foreground">GST</span><span>₹{fmt(gst)}</span></div><div className="flex justify-between border-t border-border pt-3 text-sm font-bold"><span>Estimated total</span><span className="text-primary">₹{fmt(total)}</span></div>{rentalDays > 0 && <div className="text-[10px] text-muted-foreground">{rentalDays} billable day{rentalDays === 1 ? '' : 's'} based on the selected schedule.</div>}</div><div className="mt-5 flex items-center gap-2 text-[10px] text-muted-foreground"><ShieldCheck size={14} className="text-primary" />Rate locked before confirmation</div></aside></div></div></PageFrame>;
+  return <PageFrame><div className="px-5 py-12 lg:px-9 lg:py-20"><Link href="/browse" className="mb-7 inline-flex items-center gap-2 text-xs font-semibold text-muted-foreground"><ArrowLeft size={14} /> Back to equipment</Link><div className="grid gap-8 lg:grid-cols-[1fr_.75fr]"><div><div className="mono-font text-[10px] uppercase tracking-[.18em] text-primary">Protected booking / {String(step).padStart(2, '0')} of 04</div><h1 className="display-font mt-3 text-5xl font-bold uppercase leading-[.9]">{step === 1 ? 'Schedule your machine.' : step === 2 ? 'Choose payment.' : step === 3 ? 'Review before booking.' : 'Your machine is reserved.'}</h1><div className="mt-8 grid grid-cols-4 gap-2">{[['1', 'Details'], ['2', 'Payment'], ['3', 'Review'], ['4', 'Confirmed']].map(([number, label], index) => <div key={number} className={`border-t-2 pt-2 ${step > index ? 'border-primary text-foreground' : 'border-border text-muted-foreground'}`}><div className="mono-font text-[10px]">{number}</div><div className="mt-1 text-[10px] font-semibold">{label}</div></div>)}</div>{step === 1 && <form onSubmit={saveDetails} className="mt-8 max-w-xl border border-border bg-card p-6"><div className="mb-6 flex items-start gap-3 border-l-2 border-primary bg-primary/5 p-4 text-xs leading-5 text-muted-foreground"><LockKeyhole size={16} className="mt-0.5 shrink-0 text-primary" />Choose the work schedule and provide contact details before payment is authorized.</div><div className="grid gap-4 sm:grid-cols-2"><label><span className="mono-font mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">Start date *</span><input required type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); setScheduleError(''); }} className="h-11 w-full border border-input bg-background px-3 text-sm" /></label><TimePicker label="Start time (AM / PM) *" value={startTime} onChange={(value) => { setStartTime(value); setScheduleError(''); }} /><label><span className="mono-font mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">End date *</span><input required type="date" min={startDate || undefined} value={endDate} onChange={(e) => { setEndDate(e.target.value); setScheduleError(''); }} className="h-11 w-full border border-input bg-background px-3 text-sm" /></label><TimePicker label="End time (AM / PM) *" value={endTime} onChange={(value) => { setEndTime(value); setScheduleError(''); }} /><label className="sm:col-span-2"><span className="mono-font mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">Full name *</span><input required value={details.name} onChange={(e) => setDetails({ ...details, name: e.target.value })} className="h-11 w-full border border-input bg-background px-3 text-sm" placeholder="Responsible person" /></label><label><span className="mono-font mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">Phone number *</span><input required type="tel" inputMode="tel" pattern={internationalPhonePattern} title="Enter + followed by the country code and phone number, digits only (for example, +919876543210)." value={details.phone} onChange={(e) => setDetails({ ...details, phone: e.target.value })} className="h-11 w-full border border-input bg-background px-3 text-sm" placeholder="+919876543210" /></label><label><span className="mono-font mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">Email ID *</span><input required type="email" value={details.email} onChange={(e) => setDetails({ ...details, email: e.target.value })} className="h-11 w-full border border-input bg-background px-3 text-sm" placeholder="you@company.com" /></label><label className="sm:col-span-2"><span className="mono-font mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">Delivery location *</span><input required value={location} onChange={(e) => setDeliveryLocation(e.target.value)} className="h-11 w-full border border-input bg-background px-3 text-sm" placeholder="Job site city" /></label></div>{scheduleError && <p className="mt-4 text-xs text-red-400">{scheduleError}</p>}<button className="mt-6 flex h-11 w-full items-center justify-center gap-2 bg-primary text-xs font-bold text-primary-foreground">CONTINUE TO PAYMENT <ArrowRight size={15} /></button></form>}{step === 2 && <div className="mt-8 max-w-xl border border-border bg-card p-6"><div className="flex items-center justify-between"><div><div className="mono-font text-[10px] uppercase tracking-wider text-primary">Razorpay checkout</div><h2 className="mt-2 text-xl font-bold">Select a payment method.</h2></div><CreditCard className="text-primary" /></div><div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{paymentMethods.map((method) => <button key={method} onClick={() => setPaymentMethod(method)} className={`min-h-[92px] border p-3 text-left ${paymentMethod === method ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/60'}`}><div className="grid h-7 w-7 place-items-center bg-background text-primary">{method.includes('UPI') ? <Zap size={14} /> : method === 'Card' ? <CreditCard size={14} /> : <WalletCards size={14} />}</div><div className="mt-3 text-xs font-bold">{method}</div></button>)}</div><div className="mt-6 border-t border-border pt-4 text-xs text-muted-foreground">Razorpay supports UPI QR, UPI Intent, cards, net banking, Google Pay, PhonePe, and Paytm. Live payment capture starts when Razorpay keys are configured; local mode records a safe demo authorization.</div><button onClick={authorizePayment} disabled={paymentStatus === 'authorizing'} className="mt-6 flex h-11 w-full items-center justify-center gap-2 bg-primary text-xs font-bold text-primary-foreground disabled:opacity-60">{paymentStatus === 'authorizing' ? 'AUTHORIZING PAYMENT…' : 'AUTHORIZE PAYMENT'} <ArrowRight size={15} /></button></div>}{step === 3 && <div className="mt-8 max-w-xl border border-border bg-card p-6"><div className="flex items-start gap-3 border border-emerald-400/30 bg-emerald-400/10 p-4"><Check size={18} className="text-emerald-400" /><div><div className="text-sm font-bold">Payment authorized</div><div className="mt-1 text-xs text-muted-foreground">Now confirm the booking separately so the owner can receive the work order.</div></div></div><div className="mt-6 space-y-3 text-sm"><div className="flex justify-between border-b border-border pb-3"><span className="text-muted-foreground">Customer</span><b>{details.name}</b></div><div className="flex justify-between border-b border-border pb-3"><span className="text-muted-foreground">Delivery</span><b>{location}</b></div><div className="flex justify-between border-b border-border pb-3"><span className="text-muted-foreground">Payment</span><b>{paymentMethod}</b></div><div className="flex justify-between pt-2"><span className="font-bold">Total</span><b className="text-xl text-primary">₹{fmt(total)}</b></div></div><button onClick={confirmBooking} className="mt-7 flex h-12 w-full items-center justify-center gap-2 bg-primary text-sm font-bold text-primary-foreground">CONFIRM BOOKING <Check size={16} /></button></div>}{step === 4 && <div className="mt-8 max-w-xl border border-emerald-400/30 bg-emerald-400/10 p-6"><div className="grid h-12 w-12 place-items-center rounded-full bg-emerald-400 text-[#132219]"><Check size={23} /></div><h2 className="mt-5 text-2xl font-bold">Booking confirmed.</h2><p className="mt-2 text-sm leading-6 text-muted-foreground">The owner has been notified and the equipment is reserved for your site. Your payment authorization and booking confirmation are both recorded.</p><div className="mt-6 grid gap-3 sm:grid-cols-2"><div className="border border-border bg-background/40 p-4"><div className="text-xs text-muted-foreground">Booking ID</div><div className="mt-1 font-bold">{bookingId}</div></div><div className="border border-border bg-background/40 p-4"><div className="text-xs text-muted-foreground">Next state</div><div className="mt-1 font-bold text-primary">Owner confirmation</div></div></div><div className="mt-6 flex flex-wrap gap-3"><Link href="/bookings" className="flex h-11 items-center gap-2 bg-primary px-4 text-xs font-bold text-primary-foreground">VIEW MY BOOKINGS <ArrowRight size={14} /></Link><Link href="/notifications" className="flex h-11 items-center gap-2 border border-border px-4 text-xs font-bold hover:border-primary"><Bell size={14} /> VIEW NOTIFICATIONS</Link></div></div>}</div><aside className="h-fit border border-border bg-card p-5 lg:sticky lg:top-24"><div className="mono-font text-[10px] uppercase tracking-wider text-primary">Selected equipment</div><div className="mt-4"><EquipmentIllustration kind={item.image} initials={item.type.slice(0, 3).toUpperCase()} /><h2 className="mt-4 text-lg font-bold">{item.name}</h2><div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground"><MapPin size={13} />{item.city} · {item.owner}</div></div>  <div className="mt-5 space-y-3 border-t border-border pt-4 text-xs"><div className="flex justify-between"><span className="text-muted-foreground">Rental × {rentalDays || 0} days</span><span>₹{fmt(rentalSubtotal)}</span></div><div className="flex justify-between"><span className="text-muted-foreground">Delivery &amp; platform</span><span>₹{fmt(platformFee)}</span></div><div className="flex justify-between"><span className="text-muted-foreground">GST</span><span>₹{fmt(gst)}</span></div><div className="flex justify-between border-t border-border pt-3 text-sm font-bold"><span>Estimated total</span><span className="text-primary">₹{fmt(total)}</span></div>{rentalDays > 0 && <div className="text-[10px] text-muted-foreground">{rentalDays} billable day{rentalDays === 1 ? '' : 's'} based on the selected schedule.</div>}</div><div className="mt-5 flex items-center gap-2 text-[10px] text-muted-foreground"><ShieldCheck size={14} className="text-primary" />Rate locked before confirmation</div></aside></div></div></PageFrame>;
 }
 
 function BookingsPage() {
@@ -919,7 +966,7 @@ function BookingsPage() {
     addNotification({ title: 'Booking cancelled', body: `${booking.id} was cancelled. A 5% cancellation charge of ₹${fmt(cancellationFee)} was applied and ₹${fmt(refundAmount)} will be refunded.`, kind: 'booking', read: false });
     addNotification({ title: 'Refund initiated', body: `Payment refund of ₹${fmt(refundAmount)} for ${booking.id} has been initiated.`, kind: 'payment', read: false });
   };
-  return <PageFrame><div className="px-5 py-12 lg:px-9 lg:py-20"><SectionLabel eyebrow="Customer portal / 02" title="My bookings." body="Payment, booking, location, and operation status stay visible after confirmation." /><div className="grid gap-4">{bookings.length === 0 ? <div className="border border-dashed border-border p-12 text-center"><ClipboardList className="mx-auto mb-3 text-muted-foreground" /><p className="font-semibold">No bookings yet.</p><Link href="/browse" className="mt-4 inline-flex items-center gap-2 text-xs font-bold text-primary">Browse equipment <ArrowRight size={14} /></Link></div> : bookings.map((booking) => { const canCancel = ['payment-confirmed', 'confirmed'].includes(booking.status); const formatDate = (value: string) => new Date(value).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }); return <article key={booking.id} className="border border-border bg-card p-5"><div className="flex flex-col justify-between gap-5 md:flex-row md:items-start"><div><div className="mono-font text-[10px] text-primary">{booking.id} · {booking.createdAt.slice(0, 10)}</div><h2 className="mt-2 text-lg font-bold">{booking.equipmentName}</h2><div className="mt-2 flex flex-wrap gap-4 text-xs text-muted-foreground"><span className="flex items-center gap-1"><MapPin size={13} />{booking.location}</span><span className="flex items-center gap-1"><CalendarDays size={13} />{formatDate(booking.startDate)} — {formatDate(booking.endDate)}</span></div></div><div className="flex flex-wrap gap-2 text-[10px] font-bold uppercase"><span className={`border px-2 py-1 ${booking.paymentStatus === 'refunded' ? 'border-sky-400/30 bg-sky-400/10 text-sky-300' : 'border-emerald-400/30 bg-emerald-400/10 text-emerald-400'}`}>Payment {booking.paymentStatus}</span><span className="border border-primary/30 bg-primary/10 px-2 py-1 text-primary">{booking.status.replace('-', ' ')}</span></div></div>{booking.status === 'cancelled' && <div className="mt-5 border-l-2 border-sky-400 bg-sky-400/10 p-3 text-xs text-muted-foreground">Cancellation charge: <b>₹{fmt(booking.cancellationFee ?? 0)}</b> · Refund: <b>₹{fmt(booking.refundAmount ?? 0)}</b></div>}<div className="mt-5 grid gap-3 border-t border-border pt-4 sm:grid-cols-4"><div><div className="text-[10px] text-muted-foreground">Total</div><div className="mt-1 font-bold text-primary">₹{fmt(booking.total)}</div></div><div><div className="text-[10px] text-muted-foreground">Next update</div><div className="mt-1 font-semibold">{booking.status === 'cancelled' ? 'Refund processing' : 'Owner confirmation'}</div></div><div><div className="text-[10px] text-muted-foreground">Location feed</div><div className="mt-1 font-semibold text-emerald-400">{booking.status === 'cancelled' ? 'Stopped' : 'Ready'}</div></div>{canCancel ? <button onClick={() => cancelBooking(booking)} className="text-left text-xs font-bold text-red-400 hover:text-red-300 sm:text-right">CANCEL BOOKING · 5% FEE</button> : <Link href="/notifications" className="flex items-center gap-2 text-xs font-bold text-primary sm:justify-end">VIEW STATUS <ArrowRight size={13} /></Link>}</div></article>; })}</div></div></PageFrame>;
+  return <PageFrame><div className="px-5 py-12 lg:px-9 lg:py-20"><SectionLabel eyebrow="Customer portal / 02" title="My bookings." body="Payment, booking, location, and operation status stay visible after confirmation." /><div className="grid gap-4">{bookings.length === 0 ? <div className="border border-dashed border-border p-12 text-center"><ClipboardList className="mx-auto mb-3 text-muted-foreground" /><p className="font-semibold">No bookings yet.</p><Link href="/browse" className="mt-4 inline-flex items-center gap-2 text-xs font-bold text-primary">Browse equipment <ArrowRight size={14} /></Link></div> : bookings.map((booking) => { const canCancel = ['payment-confirmed', 'confirmed'].includes(booking.status); const formatDate = (value: string) => new Date(value).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short', hour12: true }); return <article key={booking.id} className="border border-border bg-card p-5"><div className="flex flex-col justify-between gap-5 md:flex-row md:items-start"><div><div className="mono-font text-[10px] text-primary">{booking.id} · {booking.createdAt.slice(0, 10)}</div><h2 className="mt-2 text-lg font-bold">{booking.equipmentName}</h2><div className="mt-2 flex flex-wrap gap-4 text-xs text-muted-foreground"><span className="flex items-center gap-1"><MapPin size={13} />{booking.location}</span><span className="flex items-center gap-1"><CalendarDays size={13} />{formatDate(booking.startDate)} — {formatDate(booking.endDate)}</span></div></div><div className="flex flex-wrap gap-2 text-[10px] font-bold uppercase"><span className={`border px-2 py-1 ${booking.paymentStatus === 'refunded' ? 'border-sky-400/30 bg-sky-400/10 text-sky-300' : 'border-emerald-400/30 bg-emerald-400/10 text-emerald-400'}`}>Payment {booking.paymentStatus}</span><span className="border border-primary/30 bg-primary/10 px-2 py-1 text-primary">{booking.status.replace('-', ' ')}</span></div></div>{booking.status === 'cancelled' && <div className="mt-5 border-l-2 border-sky-400 bg-sky-400/10 p-3 text-xs text-muted-foreground">Cancellation charge: <b>₹{fmt(booking.cancellationFee ?? 0)}</b> · Refund: <b>₹{fmt(booking.refundAmount ?? 0)}</b></div>}<div className="mt-5 grid gap-3 border-t border-border pt-4 sm:grid-cols-4"><div><div className="text-[10px] text-muted-foreground">Total</div><div className="mt-1 font-bold text-primary">₹{fmt(booking.total)}</div></div><div><div className="text-[10px] text-muted-foreground">Next update</div><div className="mt-1 font-semibold">{booking.status === 'cancelled' ? 'Refund processing' : 'Owner confirmation'}</div></div><div><div className="text-[10px] text-muted-foreground">Location feed</div><div className="mt-1 font-semibold text-emerald-400">{booking.status === 'cancelled' ? 'Stopped' : 'Ready'}</div></div>{canCancel ? <button onClick={() => cancelBooking(booking)} className="text-left text-xs font-bold text-red-400 hover:text-red-300 sm:text-right">CANCEL BOOKING · 5% FEE</button> : <Link href="/notifications" className="flex items-center gap-2 text-xs font-bold text-primary sm:justify-end">VIEW STATUS <ArrowRight size={13} /></Link>}</div></article>; })}</div></div></PageFrame>;
 }
 
 function NotificationsPage() {
@@ -998,8 +1045,8 @@ function NewListingPage() {
   const [, setLocation] = useLocation();
   const [form, setForm] = useState({
     name: '', type: 'Excavator', city: 'Bengaluru', price: '4500', vehicleNumber: '', rcCardNumber: '',
-    ownerName: user?.fullName || '', ownerPhone: '', ownerEmail: user?.primaryEmailAddress.emailAddress || '',
-    operatorName: '', operatorPhone: '', operatorExperience: '', workingHours: '', kmDriven: '',
+    ownerName: user?.fullName || '', ownerPhone: user?.phone || defaultPhonePrefix, ownerEmail: user?.primaryEmailAddress.emailAddress || '',
+    operatorName: '', operatorPhone: defaultPhonePrefix, operatorExperience: '', workingHours: '', kmDriven: '',
     sensorsWorking: false, operatorIncluded: true,
   });
   const [validationError, setValidationError] = useState('');
@@ -1063,11 +1110,75 @@ function AdminPaymentsPage() {
 
 function AdminSensorsPage() {
   const { equipment, sensors, sensorHistory, bookings } = useAppState();
-  return <AdminShell><div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><SectionLabel eyebrow="Admin / sensors" title="ECU feed health." body="All machine telemetry is visible here: GPS, engine, fuel, electrical, hydraulic, fluid, odometer, and work-session readings." /><button type="button" onClick={() => downloadVehicleCsv(equipment, sensors, sensorHistory, bookings)} className="mb-7 flex h-11 shrink-0 items-center justify-center gap-2 bg-primary px-4 text-xs font-bold text-primary-foreground"><Download size={15} /> DOWNLOAD VEHICLE DETAILS CSV</button></div><p className="-mt-5 mb-6 text-xs text-muted-foreground">The CSV contains vehicle details, current and past sensor readings, and booking and payment details. Past sensor readings are available from when history tracking was enabled.</p><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{equipment.map((item) => { const sensor = { ...defaultSensor,
-    ...(sensors[item.id] ?? {}),
-  };
-  const readings = [['GPS latitude', `${sensor.latitude.toFixed(5)}°`], ['GPS longitude', `${sensor.longitude.toFixed(5)}°`], ['Speed', `${sensor.speedKph} km/h`], ['Odometer', `${sensor.odometerKm.toLocaleString('en-IN')} km`], ['Engine temperature', `${sensor.temperature} °C`], ['Engine RPM', `${sensor.engineRpm}`], ['Engine load', `${sensor.engineLoad}%`], ['Hydraulic pressure', `${sensor.hydraulicPressure} bar`], ['Work hours', `${sensor.workHours} h`], ['Fuel level', `${sensor.fuel}%`], ['Fuel rate', `${sensor.fuelRate} L/h`], ['Battery voltage', `${sensor.batteryVoltage} V`], ['Oil pressure', `${sensor.oilPressure} bar`], ['Coolant level', `${sensor.coolantLevel}%`], ['Distance today', `${sensor.kmDriven} km`], ['Engine state', sensor.engineStatus], ['Last ECU sync', sensor.lastSync]];
-  return <article key={item.id} className="border border-border bg-card p-5"><div className="flex items-start justify-between"><div><div className="mono-font text-[10px] text-primary">{item.type} · {item.city}</div><h3 className="mt-2 font-bold">{item.name}</h3><div className="mt-1 text-[10px] text-muted-foreground">Vehicle {item.id.toUpperCase()} · ECU connected</div></div><span className="flex items-center gap-2 text-[10px] text-emerald-400"><span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />Live</span></div><div className="mt-5 grid grid-cols-2 gap-2 text-xs">{readings.map(([label, value]) => <div key={label} className="border border-border p-3"><div className="text-[10px] text-muted-foreground">{label}</div><div className="mono-font mt-2 font-bold text-primary">{value}</div></div>)}</div></article>; })}</div></AdminShell>;
+  const [selectedVehicleId, setSelectedVehicleId] = useState('');
+  const selectedVehicle = equipment.find((item) => item.id === selectedVehicleId);
+  return <AdminShell>
+    <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+      <SectionLabel eyebrow="Admin / sensors" title="ECU feed health." body="All machine telemetry is visible here: GPS, engine, fuel, electrical, hydraulic, fluid, odometer, and work-session readings." />
+      <div className="mb-7 flex flex-col gap-2 sm:flex-row">
+        <label>
+          <span className="sr-only">Select vehicle to export</span>
+          <select
+            value={selectedVehicleId}
+            onChange={(event) => setSelectedVehicleId(event.target.value)}
+            disabled={equipment.length === 0}
+            className="h-11 min-w-56 border border-input bg-background px-3 text-xs disabled:opacity-60"
+          >
+            <option value="">Select a vehicle</option>
+            {[...equipment].sort((a, b) => a.vehicleNumber.localeCompare(b.vehicleNumber)).map((item) => (
+              <option key={item.id} value={item.id}>{item.vehicleNumber} — {item.name}</option>
+            ))}
+          </select>
+        </label>
+        <button
+          type="button"
+          disabled={!selectedVehicle}
+          onClick={() => selectedVehicle && downloadVehicleCsv(selectedVehicle, sensors, sensorHistory, bookings)}
+          className="flex h-11 shrink-0 items-center justify-center gap-2 bg-primary px-4 text-xs font-bold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <Download size={15} /> DOWNLOAD VEHICLE CSV
+        </button>
+      </div>
+    </div>
+    <p className="-mt-5 mb-6 text-xs text-muted-foreground">Select a vehicle to download its details, current and past sensor readings, and booking and payment details.</p>
+    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      {equipment.map((item) => {
+        const sensor = { ...defaultSensor, ...(sensors[item.id] ?? {}) };
+        const readings = [
+          ['GPS latitude', `${sensor.latitude.toFixed(5)}°`],
+          ['GPS longitude', `${sensor.longitude.toFixed(5)}°`],
+          ['Speed', `${sensor.speedKph} km/h`],
+          ['Odometer', `${sensor.odometerKm.toLocaleString('en-IN')} km`],
+          ['Engine temperature', `${sensor.temperature} °C`],
+          ['Engine RPM', `${sensor.engineRpm}`],
+          ['Engine load', `${sensor.engineLoad}%`],
+          ['Hydraulic pressure', `${sensor.hydraulicPressure} bar`],
+          ['Work hours', `${sensor.workHours} h`],
+          ['Fuel level', `${sensor.fuel}%`],
+          ['Fuel rate', `${sensor.fuelRate} L/h`],
+          ['Battery voltage', `${sensor.batteryVoltage} V`],
+          ['Oil pressure', `${sensor.oilPressure} bar`],
+          ['Coolant level', `${sensor.coolantLevel}%`],
+          ['Distance today', `${sensor.kmDriven} km`],
+          ['Engine state', sensor.engineStatus],
+          ['Last ECU sync', sensor.lastSync],
+        ];
+        return <article key={item.id} className="border border-border bg-card p-5">
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="mono-font text-[10px] text-primary">{item.type} · {item.city}</div>
+              <h3 className="mt-2 font-bold">{item.name}</h3>
+              <div className="mt-1 text-[10px] text-muted-foreground">Vehicle {item.vehicleNumber} · ECU connected</div>
+            </div>
+            <span className="flex items-center gap-2 text-[10px] text-emerald-400"><span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />Live</span>
+          </div>
+          <div className="mt-5 grid grid-cols-2 gap-2 text-xs">
+            {readings.map(([label, value]) => <div key={label} className="border border-border p-3"><div className="text-[10px] text-muted-foreground">{label}</div><div className="mono-font mt-2 font-bold text-primary">{value}</div></div>)}
+          </div>
+        </article>;
+      })}
+    </div>
+  </AdminShell>;
 }
 
 function AdminNotificationsPage() {

@@ -10,7 +10,10 @@
     <option name="selectedModelId" value="auto" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="9ac49d6c-4bf9-487d-9639-5b8d44fba6b9" name="Changes" comment="data base configeration" />
+    <list default="true" id="9ac49d6c-4bf9-487d-9639-5b8d44fba6b9" name="Changes" comment="data base configeration">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/artifacts/rentbuild-india/src/App.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/artifacts/rentbuild-india/src/App.tsx" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -269,6 +272,12 @@
         <option name="Make" enabled="true" />
       </method>
     </configuration>
+    <list>
+      <item itemvalue="PowerShell.bootstrap.ps1" />
+      <item itemvalue="Shell Script.main" />
+      <item itemvalue="Shell Script.rent &amp; build" />
+      <item itemvalue="Spring Boot.EquipmentImporterApplication" />
+    </list>
   </component>
   <component name="SharedIndexes">
     <attachedChunks>
